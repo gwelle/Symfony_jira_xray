@@ -1,5 +1,10 @@
 
 ###> symfony/framework-bundle ###
+.DS_Store
+src/.DS_Store
+.env
+.env.test
+.env.dev
 /.env.local
 /.env.local.php
 /.env.*.local

@@ -6,7 +6,18 @@ use App\Repository\UserRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Post;
+use Symfony\Component\Validator\Constraints as Assert;
 
+
+#[ApiResource(
+    operations:[
+        new Post(),
+        new GetCollection()
+    ]
+)]
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
@@ -17,7 +28,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 180)]
+    #[ORM\Column(length: 180, nullable: false)]
+    #[Assert\NotBlank(message: 'Please enter your email address.')]
+    #[Assert\Email(message: 'Please enter a valid email address.')]
+    #[Assert\NotNull(message: 'Email cannot be null.')]
+    #[Assert\Regex(
+        pattern: '/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/',
+        message: 'The email address "{{ value }}" is not a valid email address.'
+    )]
     private ?string $email = null;
 
     /**
@@ -29,14 +47,51 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     /**
      * @var string The hashed password
      */
-    #[ORM\Column]
+    #[ORM\Column(nullable: false)]
+    #[Assert\NotBlank(message: 'Please enter a password.')]
+    #[Assert\NotNull(message: 'Password cannot be null.')]
+    #[Assert\Length(
+        min: 8,
+        minMessage: 'Your password should be at least {{ limit }} characters long.',
+        max: 15,
+        maxMessage: 'Your password cannot be longer than {{ limit }} characters.'
+    )]
+    #[Assert\Regex(
+        pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,15}$/',
+        message: 'Password must be 8-15 characters long, contain at least one uppercase letter, one lowercase letter, and one number.'
+    )]
+    //#[Assert\NotCompromisedPassword(message: 'This password has been compromised in a data breach, please choose a different one.')]
     private ?string $password = null;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 255, nullable: false)]
+    #[Assert\NotBlank(message: 'Please enter your first name.')]
+    #[Assert\NotNull(message: 'First name cannot be null.')]
     private ?string $firstName = null;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 255, nullable: false)]
+    #[Assert\NotBlank(message: 'Please enter your last name.')]
+    #[Assert\NotNull(message: 'Last name cannot be null.')]
     private ?string $lastName = null;
+
+    #[ORM\Column(length: 255)]
+    #[Assert\NotBlank(message: 'Please confirm your password.')]
+    #[Assert\NotNull(message: 'Confirmation password cannot be null.')]
+    #[Assert\Expression(
+        'this.getPassword() === this.getConfirmationPassword()',
+        message: 'The password and confirmation password do not match.'
+    )]
+    #[Assert\Length(
+        min: 8,
+        minMessage: 'Your confirmation password should be at least {{ limit }} characters long.',
+        max: 15,
+        maxMessage: 'Your confirmation password cannot be longer than {{ limit }} characters.'
+    )]
+    #[Assert\Regex(
+        pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,15}$/',
+        message: 'Confirmation password must be 8-15 characters long, contain at least one uppercase letter, one lowercase letter, and one number.'
+    )]
+    //#[Assert\NotCompromisedPassword(message: 'This confirmation password has been compromised in a data breach, please choose a different one.')]   
+    private ?string $confirmationPassword = null;
 
     public function getId(): ?int
     {
@@ -128,6 +183,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setLastName(string $lastName): static
     {
         $this->lastName = $lastName;
+
+        return $this;
+    }
+
+    public function getConfirmationPassword(): ?string
+    {
+        return $this->confirmationPassword;
+    }
+
+    public function setConfirmationPassword(string $confirmationPassword): static
+    {
+        $this->confirmationPassword = $confirmationPassword;
 
         return $this;
     }

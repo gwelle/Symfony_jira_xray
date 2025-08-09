@@ -12,7 +12,7 @@ use ApiPlatform\Metadata\Post;
 use App\State\UserStateProcessor;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Serializer\Annotation\Groups;
-
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 
 #[ApiResource(
     operations:[
@@ -22,11 +22,19 @@ use Symfony\Component\Serializer\Annotation\Groups;
         new GetCollection(normalizationContext: ['groups' => ['user:read']]),
     ]
 )]
+#[UniqueEntity(
+    fields: ['email'],
+    message: 'The email address "{{ value }}" is already exists.'
+)]
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
+
+    public const GROUP_WRITE = 'user:write';
+    public const GROUP_READ = 'user:read';
+    
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -40,14 +48,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         pattern: '/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/',
         message: 'The email address "{{ value }}" is not a valid email address.'
     )]
-    #[Groups(['user:write','user:read'])]
+    #[Groups([self::GROUP_WRITE,self::GROUP_READ])]
     private ?string $email = null;
 
     /**
      * @var list<string> The user roles
      */
-    #[ORM\Column(type: 'array', nullable: false)]
-    #[Groups(['user:read'])]
+    #[ORM\Column(type: 'json', nullable: false)]
+    #[Groups([self::GROUP_READ])]
     private array $roles = [];
 
     /**
@@ -59,13 +67,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255, nullable: false)]
     #[Assert\NotBlank(message: 'Please enter your first name.')]
     #[Assert\NotNull(message: 'First name cannot be null.')]
-    #[Groups(['user:write','user:read'])]
+    #[Groups([self::GROUP_WRITE,self::GROUP_READ])]
     private ?string $firstName = null;
 
     #[ORM\Column(length: 255, nullable: false)]
     #[Assert\NotBlank(message: 'Please enter your last name.')]
     #[Assert\NotNull(message: 'Last name cannot be null.')]
-    #[Groups(['user:write','user:read'])]
+    #[Groups([self::GROUP_WRITE,self::GROUP_READ])]
     private ?string $lastName = null;
 
     #[Assert\NotBlank(message: 'Please confirm your password.')]
@@ -84,7 +92,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,15}$/',
         message: 'Confirmation password must be 8-15 characters long, contain at least one uppercase letter, one lowercase letter, and one number.'
     )]
-    #[Groups(['user:write'])]
+    #[Groups([self::GROUP_WRITE])]
     private ?string $confirmationPassword = null;
 
     #[Assert\NotBlank(message: 'Please enter a password.')]
@@ -99,11 +107,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,15}$/',
         message: 'Password must be 8-15 characters long, contain at least one uppercase letter, one lowercase letter, and one number.'
     )]
-    #[Groups(['user:write'])]
+    #[Groups([self::GROUP_WRITE])]
     private ?string $plainPassword = null;
 
     #[ORM\Column(nullable:true,type: 'datetime_immutable', options: ['default' => 'CURRENT_TIMESTAMP'])]
-    #[Groups(['user:read'])]
+    #[Groups([self::GROUP_READ])]
     private ?\DateTimeImmutable $createdAt = null;
 
     public function getId(): ?int

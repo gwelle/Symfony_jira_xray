@@ -9,13 +9,17 @@ use Symfony\Component\Security\Core\User\UserInterface;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
+use App\State\UserStateProcessor;
 use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 
 #[ApiResource(
     operations:[
-        new Post(),
-        new GetCollection()
+        new Post(denormalizationContext: ['groups' => ['user:write']],
+                 processor: UserStateProcessor::class,
+            ),
+        new GetCollection(normalizationContext: ['groups' => ['user:read']]),
     ]
 )]
 #[ORM\Entity(repositoryClass: UserRepository::class)]
@@ -28,7 +32,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 180, nullable: false)]
+    #[ORM\Column(length: 180, nullable: false, unique: true)]
     #[Assert\NotBlank(message: 'Please enter your email address.')]
     #[Assert\Email(message: 'Please enter a valid email address.')]
     #[Assert\NotNull(message: 'Email cannot be null.')]
@@ -36,49 +40,39 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         pattern: '/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/',
         message: 'The email address "{{ value }}" is not a valid email address.'
     )]
+    #[Groups(['user:write','user:read'])]
     private ?string $email = null;
 
     /**
      * @var list<string> The user roles
      */
-    #[ORM\Column]
+    #[ORM\Column(type: 'array', nullable: false)]
+    #[Groups(['user:read'])]
     private array $roles = [];
 
     /**
      * @var string The hashed password
      */
     #[ORM\Column(nullable: false)]
-    #[Assert\NotBlank(message: 'Please enter a password.')]
-    #[Assert\NotNull(message: 'Password cannot be null.')]
-    #[Assert\Length(
-        min: 8,
-        minMessage: 'Your password should be at least {{ limit }} characters long.',
-        max: 15,
-        maxMessage: 'Your password cannot be longer than {{ limit }} characters.'
-    )]
-    #[Assert\Regex(
-        pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,15}$/',
-        message: 'Password must be 8-15 characters long, contain at least one uppercase letter, one lowercase letter, and one number.'
-    )]
-    //#[Assert\NotCompromisedPassword(message: 'This password has been compromised in a data breach, please choose a different one.')]
     private ?string $password = null;
 
     #[ORM\Column(length: 255, nullable: false)]
     #[Assert\NotBlank(message: 'Please enter your first name.')]
     #[Assert\NotNull(message: 'First name cannot be null.')]
+    #[Groups(['user:write','user:read'])]
     private ?string $firstName = null;
 
     #[ORM\Column(length: 255, nullable: false)]
     #[Assert\NotBlank(message: 'Please enter your last name.')]
     #[Assert\NotNull(message: 'Last name cannot be null.')]
+    #[Groups(['user:write','user:read'])]
     private ?string $lastName = null;
 
-    #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Please confirm your password.')]
     #[Assert\NotNull(message: 'Confirmation password cannot be null.')]
     #[Assert\Expression(
-        'this.getPassword() === this.getConfirmationPassword()',
-        message: 'The password and confirmation password do not match.'
+        'this.getPlainPassword() === this.getConfirmationPassword()',
+        message: 'The plain password and confirmation password do not match.'
     )]
     #[Assert\Length(
         min: 8,
@@ -90,8 +84,27 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,15}$/',
         message: 'Confirmation password must be 8-15 characters long, contain at least one uppercase letter, one lowercase letter, and one number.'
     )]
-    //#[Assert\NotCompromisedPassword(message: 'This confirmation password has been compromised in a data breach, please choose a different one.')]   
+    #[Groups(['user:write'])]
     private ?string $confirmationPassword = null;
+
+    #[Assert\NotBlank(message: 'Please enter a password.')]
+    #[Assert\NotNull(message: 'Password cannot be null.')]
+    #[Assert\Length(
+        min: 8,
+        minMessage: 'Your plain password should be at least {{ limit }} characters long.',
+        max: 15,
+        maxMessage: 'Your plain password cannot be longer than {{ limit }} characters.'
+    )]
+    #[Assert\Regex(
+        pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,15}$/',
+        message: 'Password must be 8-15 characters long, contain at least one uppercase letter, one lowercase letter, and one number.'
+    )]
+    #[Groups(['user:write'])]
+    private ?string $plainPassword = null;
+
+    #[ORM\Column(nullable:true,type: 'datetime_immutable', options: ['default' => 'CURRENT_TIMESTAMP'])]
+    #[Groups(['user:read'])]
+    private ?\DateTimeImmutable $createdAt = null;
 
     public function getId(): ?int
     {
@@ -198,4 +211,29 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
         return $this;
     }
+
+    public function getCreatedAt(): ?\DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function setCreatedAt(\DateTimeImmutable $createdAt): static
+    {
+        $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    public function getPlainPassword(): ?string
+    {
+        return $this->plainPassword;
+    }
+
+    public function setPlainPassword(string $plainPassword): static
+    {
+        $this->plainPassword = $plainPassword;
+
+        return $this;
+    }
+
 }

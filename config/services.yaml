@@ -22,6 +22,16 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+    
+    ## Processor pour User (hash password + création user)
     App\State\UserStateProcessor:
         arguments:
             $processor: '@api_platform.doctrine.orm.state.persist_processor'
+            $passwordHasher: '@security.password_hasher'
+            $entityManager: '@doctrine.orm.entity_manager'
+        tags:
+            - { name: 'api_platform.state_processor', priority: 20 }
+    
+
+    
+    

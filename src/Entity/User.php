@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\UserRepository;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -29,6 +30,7 @@ use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
+#[ORM\HasLifecycleCallbacks]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
 
@@ -113,6 +115,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(nullable:true,type: 'datetime_immutable', options: ['default' => 'CURRENT_TIMESTAMP'])]
     #[Groups([self::GROUP_READ])]
     private ?\DateTimeImmutable $createdAt = null;
+
+    #[ORM\Column(type: 'boolean', nullable: false, options: ['default' => false])]
+    private ?bool $isActivated = null;
+
+    /**
+     * @var Collection<int, ActivationToken>
+     */
+    #[ORM\OneToMany(targetEntity: ActivationToken::class, mappedBy: 'account')]
+    private Collection $activationTokens;
 
     public function getId(): ?int
     {
@@ -232,6 +243,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    #[ORM\PrePersist]
+    public function onPrePersist(): void
+    {
+        if (!$this->createdAt) {
+            $this->createdAt = new \DateTimeImmutable();
+        }
+    }
+
     public function getPlainPassword(): ?string
     {
         return $this->plainPassword;
@@ -240,6 +259,46 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setPlainPassword(string $plainPassword): static
     {
         $this->plainPassword = $plainPassword;
+
+        return $this;
+    }
+
+    public function isActivated(): ?bool
+    {
+        return $this->isActivated;
+    }
+
+    public function setIsActivated(bool $isActivated): static
+    {
+        $this->isActivated = $isActivated;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, ActivationToken>
+     */
+    public function getActivationTokens(): Collection
+    {
+        return $this->activationTokens;
+    }
+
+    public function addActivationToken(ActivationToken $activationToken): static
+    {
+        if (!$this->activationTokens->contains($activationToken)) {
+            $this->activationTokens->add($activationToken);
+            $activationToken->setAccount($this);
+        }
+
+        return $this;
+    }
+
+    public function removeActivationToken(ActivationToken $activationToken): static
+    {
+        if ($this->activationTokens->removeElement($activationToken) && $activationToken->getAccount() === $this) {
+            // set the owning side to null (unless already changed)
+            $activationToken->setAccount(null);
+        }
 
         return $this;
     }

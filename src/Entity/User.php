@@ -25,7 +25,7 @@ use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 )]
 #[UniqueEntity(
     fields: ['email'],
-    message: 'The email address "{{ value }}" is already exists.'
+    message: 'L\'adresse mail "{{ value }}" Existe déjà.'
 )]
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\Table(name: '`user`')]
@@ -43,12 +43,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?int $id = null;
 
     #[ORM\Column(length: 180, nullable: false, unique: true)]
-    #[Assert\NotBlank(message: 'Please enter your email address.')]
-    #[Assert\Email(message: 'Please enter a valid email address.')]
-    #[Assert\NotNull(message: 'Email cannot be null.')]
+    #[Assert\NotBlank(message: 'L\'adresse email est obligatoire.')]
+    #[Assert\NotNull(message: 'L\'adresse email ne peut pas être null.')]
     #[Assert\Regex(
         pattern: '/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/',
-        message: 'The email address "{{ value }}" is not a valid email address.'
+        message: 'L\'adresse email "{{ value }}" est invalide.'
     )]
     #[Groups([self::GROUP_WRITE,self::GROUP_READ])]
     private ?string $email = null;
@@ -67,47 +66,50 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $password = null;
 
     #[ORM\Column(length: 255, nullable: false)]
-    #[Assert\NotBlank(message: 'Please enter your first name.')]
-    #[Assert\NotNull(message: 'First name cannot be null.')]
+    #[Assert\NotBlank(message: 'Le prénom est obligatoire.')]
+    #[Assert\NotNull(message: 'Le prénom ne peut pas être null.')]
     #[Groups([self::GROUP_WRITE,self::GROUP_READ])]
     private ?string $firstName = null;
 
     #[ORM\Column(length: 255, nullable: false)]
-    #[Assert\NotBlank(message: 'Please enter your last name.')]
-    #[Assert\NotNull(message: 'Last name cannot be null.')]
+    #[Assert\NotBlank(message: 'Le prénom est obligatoire.')]
+    #[Assert\NotNull(message: 'Le prénom ne peut pas être null.')]
+    #[Assert\Regex(
+        pattern: '/^[A-Za-z]+$/',
+    message: 'Le nom ne doit contenir que des lettres.'
+    )]
     #[Groups([self::GROUP_WRITE,self::GROUP_READ])]
     private ?string $lastName = null;
 
-    #[Assert\NotBlank(message: 'Please confirm your password.')]
-    #[Assert\NotNull(message: 'Confirmation password cannot be null.')]
+    #[Assert\NotBlank(message: 'La confirmation du mot de passe obligatoire.')]
     #[Assert\Expression(
         'this.getPlainPassword() === this.getConfirmationPassword()',
-        message: 'The plain password and confirmation password do not match.'
+        message: 'Le mot de passe et le mot de passe de confirmation ne correspondent pas.'
     )]
     #[Assert\Length(
         min: 8,
-        minMessage: 'Your confirmation password should be at least {{ limit }} characters long.',
+        minMessage: 'Votre mot de passe de confirmation doit comporter au moins {{ limit }} caractères.',
         max: 15,
-        maxMessage: 'Your confirmation password cannot be longer than {{ limit }} characters.'
+        maxMessage: 'Votre mot de passe de confirmation ne peut pas dépasser {{ limit }} caractères.'
     )]
     #[Assert\Regex(
         pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,15}$/',
-        message: 'Confirmation password must be 8-15 characters long, contain at least one uppercase letter, one lowercase letter, and one number.'
+        message: 'Le mot de passe de confirmation doit contenir au moins une lettre majuscule, une minuscule, un chiffre et un caractère spécial.'
     )]
     #[Groups([self::GROUP_WRITE])]
     private ?string $confirmationPassword = null;
 
-    #[Assert\NotBlank(message: 'Please enter a password.')]
-    #[Assert\NotNull(message: 'Password cannot be null.')]
+    #[Assert\NotBlank(message: 'Le mot de passe est obligatoire.')]
+    #[Assert\NotNull(message: 'Le mot de passe neut pas être null.')]
     #[Assert\Length(
         min: 8,
-        minMessage: 'Your plain password should be at least {{ limit }} characters long.',
+        minMessage: 'Votre mot de passe doit comporter au moins {{ limit }} caractères.',
         max: 15,
-        maxMessage: 'Your plain password cannot be longer than {{ limit }} characters.'
+        maxMessage: 'Votre mot de passe de confirmation ne peut pas dépasser {{ limit }} caractères.'
     )]
     #[Assert\Regex(
         pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,15}$/',
-        message: 'Password must be 8-15 characters long, contain at least one uppercase letter, one lowercase letter, and one number.'
+        message: 'Le mot de passe doit contenir au moins une lettre majuscule, une minuscule, un chiffre et un caractère spécial.'
     )]
     #[Groups([self::GROUP_WRITE])]
     private ?string $plainPassword = null;

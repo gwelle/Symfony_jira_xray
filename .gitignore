@@ -2,6 +2,7 @@
 ###> symfony/framework-bundle ###
 .DS_Store
 src/.DS_Store
+.env
 /.env
 /.env.local
 /.env.local.php
@@ -10,4 +11,5 @@ src/.DS_Store
 /public/bundles/
 /var/
 /vendor/
+/config/certs/
 ###< symfony/framework-bundle ###

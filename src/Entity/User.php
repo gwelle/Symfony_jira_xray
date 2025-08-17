@@ -66,6 +66,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255, nullable: false)]
     #[Assert\NotBlank(message: 'Le prénom est obligatoire.')]
     #[Assert\NotNull(message: 'Le prénom ne peut pas être null.')]
+    #[Assert\Regex(
+        pattern: '/^[A-Za-z]+$/',
+    message: 'Le prénom ne doit contenir que des lettres.'
+    )]
     #[Groups([self::GROUP_WRITE,self::GROUP_READ])]
     private ?string $firstName = null;
 

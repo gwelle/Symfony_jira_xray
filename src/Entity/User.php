@@ -8,6 +8,8 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
 use App\State\UserStateProcessor;
 use Symfony\Component\Validator\Constraints as Assert;
@@ -15,9 +17,16 @@ use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 
 #[ApiResource(
-    operations:[
-        new Post(denormalizationContext: ['groups' => ['user:write']],
-                 processor: UserStateProcessor::class,
+    operations: [
+        new Post(
+            denormalizationContext: ['groups' => [self::GROUP_WRITE]],
+            processor: UserStateProcessor::class
+        ),
+        new GetCollection(
+            normalizationContext: ['groups' => [self::GROUP_READ]]
+        ),
+        new Get(
+            normalizationContext: ['groups' => [self::GROUP_READ]]
         )
     ]
 )]
@@ -67,8 +76,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Assert\NotBlank(message: 'Le prénom est obligatoire.')]
     #[Assert\NotNull(message: 'Le prénom ne peut pas être null.')]
     #[Assert\Regex(
-        pattern: '/^[A-Za-z]+$/',
-    message: 'Le prénom ne doit contenir que des lettres.'
+        pattern: '/^[\p{L}]+(?:[ \'-][\p{L}]+)*$/u',
+        message: "Le prénom doit contenir uniquement des lettres, espaces, tirets ou apostrophes correctement placés."
     )]
     #[Groups([self::GROUP_WRITE,self::GROUP_READ])]
     private ?string $firstName = null;
@@ -77,17 +86,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Assert\NotBlank(message: 'Le prénom est obligatoire.')]
     #[Assert\NotNull(message: 'Le prénom ne peut pas être null.')]
     #[Assert\Regex(
-        pattern: '/^[A-Za-z]+$/',
-    message: 'Le nom ne doit contenir que des lettres.'
+        pattern: '/^[\p{L}]+(?:[ \'-][\p{L}]+)*$/u',
+            message: "Le nom ou prénom doit contenir uniquement des lettres, espaces, tirets ou apostrophes correctement placés."
     )]
     #[Groups([self::GROUP_WRITE,self::GROUP_READ])]
     private ?string $lastName = null;
 
-    //#[Assert\NotBlank(message: 'La confirmation du mot de passe obligatoire.')]
-    /*#[Assert\Expression(
+    #[Assert\NotBlank(message: 'La confirmation du mot de passe obligatoire.')]
+    #[Assert\Expression(
         'this.getPlainPassword() === this.getConfirmationPassword()',
         message: 'Le mot de passe et le mot de passe de confirmation ne correspondent pas.'
-    )]*/
+    )]
     #[Assert\Length(
         min: 8,
         minMessage: 'Votre mot de passe de confirmation doit comporter au moins {{ limit }} caractères.',
@@ -127,6 +136,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      * @var Collection<int, ActivationToken>
      */
     #[ORM\OneToMany(targetEntity: ActivationToken::class, mappedBy: 'account')]
+    #[Groups([self::GROUP_READ])]
     private Collection $activationTokens;
 
     public function getId(): ?int

@@ -4,25 +4,23 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use App\Entity\User;
-use App\Entity\ActivationToken;
-use Doctrine\ORM\EntityManagerInterface;
+
 use ApiPlatform\State\ProcessorInterface;
+use App\Service\ActivationService;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class UserStateProcessor implements ProcessorInterface
 {
     /**
      * Constructor for UserStateProcessor.
-     * This processor is responsible for handling the user state processing logic.
-     *
-     * @param ProcessorInterface $processor The default processor to delegate to after processing.
-     * @param EntityManagerInterface $entityManager The entity manager for database operations.
+     * @param ProcessorInterface $processor The next processor in the chain.
      * @param UserPasswordHasherInterface $passwordHasher The password hasher service.
+     * @param ActivationService $activationService The activation service for generating tokens.
      */
     public function __construct(
         private ProcessorInterface $processor,
-        private EntityManagerInterface $entityManager,
-        private UserPasswordHasherInterface $passwordHasher
+        private UserPasswordHasherInterface $passwordHasher,
+        private ActivationService $activationService
     ) {}
 
     /**
@@ -50,24 +48,12 @@ class UserStateProcessor implements ProcessorInterface
         
             $data->setIsActivated(false); // Set default activation status
 
-            
             $user = $this->processor->process($data, $operation, $uriVariables, $context);
 
-            // Generate a new plain token
-            $plainToken = bin2hex(random_bytes(32));
-                
-            $activationToken = new ActivationToken();
-            $activationToken->setAccount($data);
-            $activationToken->setHashedToken(hash('sha256', $plainToken));
-            $activationToken->setCreatedAt(new \DateTimeImmutable());
-            $activationToken->setExpiredAt((new \DateTimeImmutable())->modify('+24 hours'));
+            // Generate and persist the activation token
+            $this->activationService->generateToken($data);
 
-            // Persist the activation token
-            $this->entityManager->persist($activationToken);
-            $this->entityManager->flush();
-
-            // Return the user entity after processing
-            return $user;
+            return $user ;
         }
 
 

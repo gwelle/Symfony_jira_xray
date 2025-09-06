@@ -22,7 +22,7 @@ class ActivationService
      * Generates a new activation token for the given user.
      *
      * @param User $user The user for whom the activation token is to be generated.
-     * @return ActivationToken The generated activation token entity.
+     * @return string The generated activation token.
      */
     public function generateToken(User $user): string
     {
@@ -59,9 +59,12 @@ class ActivationService
                 ['createdAt' => 'DESC']
         );
 
-        // Si aucun token ou token expiré, en créer un nouveau
+
         if (!$token || $token->getExpiredAt() < new \DateTimeImmutable()) {
-            $token = $this->generateToken($user);
+            $plainToken = $this->generateToken($user); // retourne le token en clair
+            $hashedToken = hash('sha256', $plainToken); // hash pour chercher en base
+            $token = $this->entityManager->getRepository(ActivationToken::class)
+                ->findOneBy(['hashedToken' => $hashedToken]); // récupère l'objet ActivationToken
         }
 
         return $token;
@@ -73,8 +76,11 @@ class ActivationService
      * @param string $token The activation token.
      * @return bool True if the account was successfully activated, false otherwise.
      */
-    public function activateAccount(string $hashedToken): bool
+    public function activateAccount(string $plainToken): bool
     {
+        // Hash the provided token to match the stored format
+        $hashedToken = hash('sha256', $plainToken);
+        
         $activationToken = $this->entityManager->getRepository(ActivationToken::class)
             ->findOneBy(['hashedToken' => $hashedToken]);
 

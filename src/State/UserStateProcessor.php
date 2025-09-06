@@ -8,6 +8,7 @@ use App\Entity\User;
 use ApiPlatform\State\ProcessorInterface;
 use App\Service\ActivationService;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use App\Service\MailerService;
 
 class UserStateProcessor implements ProcessorInterface
 {
@@ -20,7 +21,8 @@ class UserStateProcessor implements ProcessorInterface
     public function __construct(
         private ProcessorInterface $processor,
         private UserPasswordHasherInterface $passwordHasher,
-        private ActivationService $activationService
+        private ActivationService $activationService,
+        private MailerService $mailerService
     ) {}
 
     /**
@@ -51,7 +53,14 @@ class UserStateProcessor implements ProcessorInterface
             $user = $this->processor->process($data, $operation, $uriVariables, $context);
 
             // Generate and persist the activation token
-            $this->activationService->generateToken($user);
+            $token = $this->activationService->generateToken($user);
+
+            // Send the confirmation email with the token
+            $this->mailerService->sendConfirmationEmail(
+                $user->getEmail(),
+                $token,
+                $user->getFirstName().' '.$user->getLastName()
+            );
 
             return $user ;
         }

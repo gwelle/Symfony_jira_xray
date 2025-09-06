@@ -32,7 +32,7 @@ final class HomeController extends AbstractController
         ]);
     }
 
-    #[Route('/api/users/activate/{token}', name: 'user_activate', methods: ['GET'])]
+    #[Route('/api/users/activate_account/{token}', name: 'user_activate', methods: ['GET'])]
     public function activate(string $token, ActivationService $activationService): Response
     {
         $success = $activationService->activateAccount($token);

@@ -31,20 +31,26 @@ class MailerService{
      * @param string $email The recipient's email address.
      * @param string $token The activation token to be included in the email.
      * @param string $userName The name of the user to personalize the email.
+     * @param bool $isResend Indicates if this is a resend of the confirmation email.
      */
-    public function sendConfirmationEmail(string $email, string $token, string $userName)
+    public function sendConfirmationEmail(string $email, string $token, string $userName,bool $isResend = false)
     {
         $confirmationUrl = $this->activationAccountUrl . "/activate_account/".urlencode($token);
+        $resendUrl = $this->activationAccountUrl . "/resend_activation_account/".urlencode($email);
+
+        $subject = $isResend ?
+        'Renvoi du lien de confirmation de votre compte' : 'Confirmation de votre compte';
 
         $emailMessage = (new Email())
             ->from('no-reply@account.com')
             ->to($email)
-            ->subject('Confirmation de votre compte')
+            ->subject($subject)
             ->html("
                 <p>Bonjour {$userName},</p>
                 <p>Merci de vous être inscrit. Pour activer votre compte, cliquez sur ce lien :</p>
                 <p><a href='{$confirmationUrl}'>Activer mon compte</a></p>
                 <p>Ce lien est valable 24 heures.</p>
+                <p>Si le lien est expiré, <a href='{$resendUrl}'>cliquez ici pour demander un nouvel e-mail de confirmation</a>.</p>
             ");
 
         $this->mailer->send($emailMessage);

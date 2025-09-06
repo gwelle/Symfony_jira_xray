@@ -59,7 +59,8 @@ class UserStateProcessor implements ProcessorInterface
             $this->mailerService->sendConfirmationEmail(
                 $user->getEmail(),
                 $token,
-                $user->getFirstName().' '.$user->getLastName()
+                $user->getFirstName().' '.$user->getLastName(),
+                false // Indique que ce n'est pas un renvoi
             );
 
             return $user ;

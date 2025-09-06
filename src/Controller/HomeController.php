@@ -8,6 +8,8 @@ use Symfony\Component\Routing\Attribute\Route;
 use App\Entity\User;
 use App\Service\ActivationService;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Doctrine\ORM\EntityManagerInterface;
+use App\Service\MailerService;
 
 final class HomeController extends AbstractController
 {
@@ -20,6 +22,12 @@ final class HomeController extends AbstractController
         return $this->redirect('/api');
     }
 
+    /**
+     * Fetches a valid activation token for the specified user.
+     * @param User $user
+     * @param ActivationService $activationService
+     * @return JsonResponse
+     */
     #[Route('/api/users/{id}/token', methods: ['GET'])]
     public function getTokenForUser(User $user, ActivationService $activationService): JsonResponse
     {
@@ -32,16 +40,62 @@ final class HomeController extends AbstractController
         ]);
     }
 
+    /**
+     * Activates a user account based on the provided token.
+     * Redirects to the frontend login page with activation status.
+     *
+     * @param string $token The activation token from the URL.
+     * @param ActivationService $activationService The service to handle activation logic.
+     * @return Response A redirect response to the frontend login page with query parameters indicating success or failure.
+     */
     #[Route('/api/users/activate_account/{token}', name: 'user_activate', methods: ['GET'])]
     public function activate(string $token, ActivationService $activationService): Response
     {
         $success = $activationService->activateAccount($token);
+        $frontendLoginUrl = $_ENV['URL_LOGIN_FRONT'].'/login';
 
         if ($success) {
-            return new JsonResponse(['message' => 'Compte activé avec succès !']);
+            return $this->redirect($frontendLoginUrl .'?activated=1');
         }
 
-        return new JsonResponse(['message' => 'Token invalide ou expiré.'], 400);
+        return $this->redirect($frontendLoginUrl . '?activated=0&error=token_expired');
+    }
+
+    /**
+     * Resends the activation email to the user with a new token.
+     *
+     * @param string $email The email address of the user requesting a new activation email.
+     * @param ActivationService $activationService The service to handle activation logic.
+     * @param MailerService $mailerService The service to send emails.
+     * @param EntityManagerInterface $em The entity manager for database operations.
+     * @return JsonResponse A JSON response indicating success or failure of the operation.
+     */
+    #[Route('/api/users/resend_activation_account/{email}', name: 'user_resend_activation', methods: ['GET', 'POST'])]
+    public function resendActivation(string $email, ActivationService $activationService,
+        MailerService $mailerService, EntityManagerInterface $em): JsonResponse {
+
+    $user = $em->getRepository(User::class)->findOneBy(['email' => $email]);
+
+    if (!$user) {
+        return new JsonResponse(['message' => 'Utilisateur introuvable.'], 404);
+    }
+
+    if ($user->isActivated()) {
+        return new JsonResponse(['message' => 'Ce compte est déjà activé.'], 400);
+    }
+
+    // Générer un nouveau token
+    $token = $activationService->generateToken($user);
+
+    // Renvoyer l’e-mail
+    $mailerService->sendConfirmationEmail(
+        $user->getEmail(),
+        $token,
+        $user->getFirstName().' '.$user->getLastName(),
+        true // Indique que c'est un renvoi
+    );
+
+    return new JsonResponse(['message' => 'Un nouvel e-mail de confirmation a été envoyé.']);
     }
 
 }

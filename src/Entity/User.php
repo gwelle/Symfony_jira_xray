@@ -21,12 +21,6 @@ use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
         new Post(
             denormalizationContext: ['groups' => [self::GROUP_WRITE]],
             processor: UserStateProcessor::class
-        ),
-        new GetCollection(
-            normalizationContext: ['groups' => [self::GROUP_READ]]
-        ),
-        new Get(
-            normalizationContext: ['groups' => [self::GROUP_READ]]
         )
     ]
 )]
@@ -92,11 +86,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups([self::GROUP_WRITE,self::GROUP_READ])]
     private ?string $lastName = null;
 
-    #[Assert\NotBlank(message: 'La confirmation du mot de passe obligatoire.')]
-    #[Assert\Expression(
-        'this.getPlainPassword() === this.getConfirmationPassword()',
-        message: 'Le mot de passe et le mot de passe de confirmation ne correspondent pas.'
-    )]
     #[Assert\Length(
         min: 8,
         minMessage: 'Votre mot de passe de confirmation doit comporter au moins {{ limit }} caractères.',

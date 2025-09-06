@@ -51,7 +51,7 @@ class UserStateProcessor implements ProcessorInterface
             $user = $this->processor->process($data, $operation, $uriVariables, $context);
 
             // Generate and persist the activation token
-            $this->activationService->generateToken($data);
+            $this->activationService->generateToken($user);
 
             return $user ;
         }

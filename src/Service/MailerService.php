@@ -38,20 +38,27 @@ class MailerService{
         $confirmationUrl = $this->activationAccountUrl . "/activate_account/".urlencode($token);
         $resendUrl = $this->activationAccountUrl . "/resend_activation_account/".urlencode($email);
 
-        $subject = $isResend ?
-        'Renvoi du lien de confirmation de votre compte' : 'Confirmation de votre compte';
+        if ($isResend) {
+        $subject = 'Renvoi du lien de confirmation de votre compte';
+        $html = "<p>Bonjour {$userName},</p>
+                 <p>Voici un nouveau lien pour activer votre compte :</p>
+                 <p><a href='{$confirmationUrl}'>Activer mon compte</a></p>";
+        }
+        else {
+            $subject = 'Confirmation de votre compte';
+            $html = "
+                <p>Bonjour {$userName},</p>
+                <p>Merci de vous être inscrit. Pour activer votre compte, cliquez sur ce lien :</p>
+                <p><a href='{$confirmationUrl}'>Activer mon compte</a></p>
+                <p>Ce lien est valable 24 heures.</p>
+                <p>Si le lien est expiré, <a href='{$resendUrl}'>cliquez ici pour demander un nouvel e-mail de confirmation</a>.</p>";
+    }
 
         $emailMessage = (new Email())
             ->from('no-reply@account.com')
             ->to($email)
             ->subject($subject)
-            ->html("
-                <p>Bonjour {$userName},</p>
-                <p>Merci de vous être inscrit. Pour activer votre compte, cliquez sur ce lien :</p>
-                <p><a href='{$confirmationUrl}'>Activer mon compte</a></p>
-                <p>Ce lien est valable 24 heures.</p>
-                <p>Si le lien est expiré, <a href='{$resendUrl}'>cliquez ici pour demander un nouvel e-mail de confirmation</a>.</p>
-            ");
+            ->html($html);
 
         $this->mailer->send($emailMessage);
     }

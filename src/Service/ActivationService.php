@@ -33,7 +33,7 @@ class ActivationService
         $activationToken->setAccount($user);
         $activationToken->setHashedToken(hash('sha256', $plainToken));
         $activationToken->setCreatedAt(new \DateTimeImmutable());
-        $activationToken->setExpiredAt((new \DateTimeImmutable())->modify('+24 hours'));
+
 
         // Persist the token entity
         $this->entityManager->persist($activationToken);
@@ -106,4 +106,38 @@ class ActivationService
         return true;
     }
 
+    /**
+    * Refreshes activation tokens for users who haven't activated their account after 1 hour.
+    * Updates the existing token in place, setting a new creation date and hashed token.
+    */
+    public function refreshExpiredTokens(): void{
+        // Récupérer tous les tokens sans date d'expiration et créés il y a plus d'1h
+        $tokens = $this->entityManager
+            ->getRepository(ActivationToken::class)
+            ->createQueryBuilder('t')
+            ->where('t.expiredAt IS NULL')
+            ->andWhere('t.createdAt < :limit')
+            ->setParameter('limit', new \DateTimeImmutable('-1 hour'))
+            ->getQuery()
+            ->getResult();
+
+        foreach ($tokens as $token) {
+            $account = $token->getAccount();
+
+            // Si l'utilisateur n'est pas activé
+            if (!$account->getIsActivated()) {
+
+                // Marquer l'ancien token comme expiré
+                $token->setExpiredAt(new \DateTimeImmutable());
+
+                // Générer un nouveau token dans le même enregistrement
+                $token->setHashedToken(hash('sha256', bin2hex(random_bytes(32))));
+                $token->setCreatedAt(new \DateTimeImmutable());
+                $token->setExpiredAt(null); // sera à nouveau mis à jour après 1h si non activé
+
+                $this->entityManager->persist($token);
+            }
+        }
+        $this->entityManager->flush();
+    }
 }

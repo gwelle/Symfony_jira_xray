@@ -73,12 +73,23 @@ class ActivationToken
         return $this->expiredAt;
     }
 
-    public function setExpiredAt(\DateTimeImmutable $expiredAt): static
+    public function setExpiredAt(?\DateTimeImmutable $expiredAt): static
     {
         $this->expiredAt = $expiredAt;
 
         return $this;
     }
+
+    public function isExpired(): bool
+    {
+        return $this->expiredAt !== null && $this->expiredAt < new \DateTimeImmutable();
+    }
+
+    public function isValid(): bool
+    {
+        return !$this->isExpired();
+    }
+
 
     public function getHashedToken(): ?string
     {

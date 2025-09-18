@@ -44,6 +44,28 @@ class ActivationService
     }
 
     /**
+     * Regénère un token existant dans le même enregistrement.
+     *
+     * @param ActivationToken $activationToken
+     * @return string Le nouveau token en clair (à envoyer si besoin)
+     */
+    public function regenerateToken(ActivationToken $activationToken): string
+    {
+        // Nouveau token en clair
+        $plainToken = bin2hex(random_bytes(32));
+
+        // Réinitialiser avec de nouvelles valeurs
+        $activationToken->setHashedToken(hash('sha256', $plainToken));
+        $activationToken->setCreatedAt(new \DateTimeImmutable());
+        $activationToken->setExpiredAt(null); // On remet à null → valide tant qu’il n’est pas dépassé
+
+        $this->entityManager->persist($activationToken);
+
+        return $plainToken;
+    }
+
+
+    /**
      * Retrieves a valid activation token for the given user.
      * If no valid token exists, a new one is generated.
      *
@@ -60,7 +82,7 @@ class ActivationService
         );
 
 
-        if (!$token || $token->getExpiredAt() < new \DateTimeImmutable()) {
+        if (!$token || !$token->isValid()) {
             $plainToken = $this->generateToken($user); // retourne le token en clair
             $hashedToken = hash('sha256', $plainToken); // hash pour chercher en base
             $token = $this->entityManager->getRepository(ActivationToken::class)
@@ -74,9 +96,9 @@ class ActivationService
      * Activates a user account based on the provided token.
      *
      * @param string $token The activation token.
-     * @return bool True if the account was successfully activated, false otherwise.
+     * @return string 'success', 'expired', 'invalid'
      */
-    public function activateAccount(string $plainToken): bool
+    public function activateAccount(string $plainToken): string
     {
         // Hash the provided token to match the stored format
         $hashedToken = hash('sha256', $plainToken);
@@ -84,14 +106,19 @@ class ActivationService
         $activationToken = $this->entityManager->getRepository(ActivationToken::class)
             ->findOneBy(['hashedToken' => $hashedToken]);
 
-        // Si le token n'existe pas ou est expiré, retourner false
-        if (!$activationToken || $activationToken->getExpiredAt() < new \DateTimeImmutable()) {
-            return false;
+        if (!$activationToken) {
+            return 'invalid';
         }
 
-        // Activer le compte utilisateur
+        if ($activationToken->isExpired()) {
+            return 'expired';
+        }
+
         $user = $activationToken->getAccount();
+        
+        // Activer le compte utilisateur
         $user->setIsActivated(true);
+
 
         // Remove all tokens associated with the user
         $tokens = $this->entityManager->getRepository(ActivationToken::class)
@@ -103,41 +130,51 @@ class ActivationService
 
         $this->entityManager->flush();
 
-        return true;
+        return 'success';
     }
 
     /**
     * Refreshes activation tokens for users who haven't activated their account after 1 hour.
     * Updates the existing token in place, setting a new creation date and hashed token.
     */
-    public function refreshExpiredTokens(): void{
+    public function refreshExpiredTokens(): array{
         // Récupérer tous les tokens sans date d'expiration et créés il y a plus d'1h
-        $tokens = $this->entityManager
-            ->getRepository(ActivationToken::class)
-            ->createQueryBuilder('t')
-            ->where('t.expiredAt IS NULL')
-            ->andWhere('t.createdAt < :limit')
-            ->setParameter('limit', new \DateTimeImmutable('-1 hour'))
-            ->getQuery()
-            ->getResult();
+        $connection = $this->entityManager->getConnection();
 
+        $sql = "
+            SELECT id
+            FROM activation_token
+            WHERE expired_at IS NULL
+            AND created_at < NOW() - INTERVAL '1 hour'
+            ORDER BY created_at ASC
+            LIMIT 50
+        ";
+
+        $ids = $connection->executeQuery($sql)->fetchFirstColumn(); // récupère juste la colonne `id`
+        $tokens = !empty($ids) ? $this->entityManager
+            ->getRepository(ActivationToken::class)
+            ->findBy(['id' => $ids]) : [];
+
+        $updatedIds = [];
+
+        // Pour chaque token, vérifier si l'utilisateur est activé
+        // Si non, régénérer le token dans le même enregistrement
         foreach ($tokens as $token) {
-            $account = $token->getAccount();
+            $user = $token->getAccount();
 
             // Si l'utilisateur n'est pas activé
-            if (!$account->getIsActivated()) {
+            if (!$user->isActivated()) {
 
                 // Marquer l'ancien token comme expiré
                 $token->setExpiredAt(new \DateTimeImmutable());
 
                 // Générer un nouveau token dans le même enregistrement
-                $token->setHashedToken(hash('sha256', bin2hex(random_bytes(32))));
-                $token->setCreatedAt(new \DateTimeImmutable());
-                $token->setExpiredAt(null); // sera à nouveau mis à jour après 1h si non activé
+               $this->regenerateToken($token);
 
-                $this->entityManager->persist($token);
+               $updatedIds[] = $token->getId();
             }
         }
         $this->entityManager->flush();
+        return $updatedIds;
     }
 }

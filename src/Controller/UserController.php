@@ -30,23 +30,6 @@ final class UserController extends AbstractController
         return $this->redirect('/api');
     }
 
-    /**
-     * Fetches a valid activation token for the specified user.
-     * @param User $user
-     * @param ActivationService $activationService
-     * @return JsonResponse
-     */
-    #[Route('/api/users/{id}/token', methods: ['GET'])]
-    public function getTokenForUser(User $user, ActivationService $activationService): JsonResponse
-    {
-        $token = $activationService->getValidTokenForUser($user);
-    
-        return $this->json([
-            'user' => $user->getEmail(),
-            'token' => $token->getHashedToken(),
-            'expiresAt' => $token->getExpiredAt(),
-        ]);
-    }
 
     /**
      * Activates a user account based on the provided token.
@@ -61,11 +44,16 @@ final class UserController extends AbstractController
     {
         $success = $activationService->activateAccount($token);
         
-        if ($success) {
-            return $this->redirect("{$this->frontendLoginUrl}?activated=1",);
+        switch ($success) {
+            case 'success':
+                return $this->redirect("{$this->frontendLoginUrl}?activated=1");
+            case 'expired':
+                return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=token_expired&resend=1");
+            case 'invalid':
+                return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=invalid_token");
+            default:
+                return $this->redirect("{$this->frontendLoginUrl}?activated=0&failed=activation_failed");
         }
-
-        return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=token_expired");
     }
 
     /**
@@ -88,7 +76,7 @@ final class UserController extends AbstractController
         }
 
         if ($user->isActivated()) {
-            return $this->redirect("{$this->frontendLoginUrl}?activated=1&existing=true");
+            return $this->redirect("{$this->frontendLoginUrl}?activated=1&info=already_activated");
         }
 
         // Générer un nouveau token
@@ -103,6 +91,43 @@ final class UserController extends AbstractController
         );
 
         return new JsonResponse(['message' => 'Un nouvel e-mail de confirmation a été envoyé.']);
+    }
+
+    /**
+     * Refreshes expired activation tokens for users who haven't activated their accounts.
+     * @param ActivationService $activationService The service to handle activation logic.
+     * @return JsonResponse A JSON response indicating the result of the token refresh operation.
+     */
+    #[Route('/api/users/refresh_tokens', name: 'refresh_tokens', methods: ['POST'])]
+    public function refreshExpiredTokens(ActivationService $activationService): JsonResponse
+    {
+        // Appelle la méthode pour rafraîchir les tokens expirés
+        $results = $activationService->refreshExpiredTokens();
+        
+
+        return new JsonResponse([
+            'status' => 'success',
+            'message' => 'Tokens refreshed',
+            'data' => $results,
+        ]);
+    }
+
+    /**
+     * Fetches a valid activation token for the specified user.
+     * @param User $user
+     * @param ActivationService $activationService
+     * @return JsonResponse
+     */
+    #[Route('/api/users/{id}/token', methods: ['GET'])]
+    public function getTokenForUser(User $user, ActivationService $activationService): JsonResponse
+    {
+        $token = $activationService->getValidTokenForUser($user);
+    
+        return $this->json([
+            'user' => $user->getEmail(),
+            'token' => $token->getHashedToken(),
+            'expiresAt' => $token->getExpiredAt(),
+        ]);
     }
 }
 

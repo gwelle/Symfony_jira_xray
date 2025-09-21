@@ -30,29 +30,50 @@ final class UserController extends AbstractController
         return $this->redirect('/api');
     }
 
-
     /**
      * Activates a user account based on the provided token.
      * Redirects to the frontend login page with activation status.
      *
      * @param string $token The activation token from the URL.
      * @param ActivationService $activationService The service to handle activation logic.
+     * @param MailerService $mailerService The service to send emails.
+     * @param EntityManagerInterface $em The entity manager for database operations.
      * @return Response A redirect response to the frontend login page with query parameters indicating success or failure.
      */
     #[Route('/api/users/activate_account/{token}', name: 'user_activate', methods: ['GET'])]
-    public function activate(string $token, ActivationService $activationService): Response
+    public function activate(string $token, ActivationService $activationService,MailerService $mailerService,
+    EntityManagerInterface $em): Response
     {
-        $success = $activationService->activateAccount($token);
-        
-        switch ($success) {
-            case 'success':
-                return $this->redirect("{$this->frontendLoginUrl}?activated=1");
-            case 'expired':
-                return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=token_expired&resend=1");
-            case 'invalid':
-                return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=invalid_token");
-            default:
-                return $this->redirect("{$this->frontendLoginUrl}?activated=0&failed=activation_failed");
+        // Nettoyage du token reçu
+    $plainToken = trim($token);
+    $hashedToken = hash('sha256', $plainToken);
+
+    $results = $activationService->activateAccount($plainToken);
+
+    switch ($results['status']) {
+        case 'success':
+            return $this->redirect("{$this->frontendLoginUrl}?activated=1");
+
+        case 'expired':
+            $tokenExpired = $results['token']; // objet ActivationToken
+            $user = $tokenExpired->getAccount();
+
+            // Génération nouveau token
+            $newToken = $activationService->generateToken($user);
+
+            // Envoi email de confirmation
+            $mailerService->sendConfirmationEmail(
+                $user->getEmail(),
+                $newToken,
+                $user->getFirstName().' '.$user->getLastName(),
+                true
+            );
+
+            return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=token_expired&resend=1");
+
+        case 'invalid':
+        default:
+            return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=invalid_token");
         }
     }
 
@@ -130,6 +151,3 @@ final class UserController extends AbstractController
         ]);
     }
 }
-
-
-

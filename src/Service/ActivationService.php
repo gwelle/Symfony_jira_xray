@@ -33,7 +33,7 @@ class ActivationService
         $activationToken->setAccount($user);
         $activationToken->setHashedToken(hash('sha256', $plainToken));
         $activationToken->setCreatedAt(new \DateTimeImmutable());
-
+        $activationToken->setExpiredAt(null);
 
         // Persist the token entity
         $this->entityManager->persist($activationToken);
@@ -44,26 +44,30 @@ class ActivationService
     }
 
     /**
-     * Regénère un token existant dans le même enregistrement.
-     *
+     * Régénère un token pour l’utilisateur.
+     * Marque toujours l’ancien token comme expiré avant de créer le nouveau.
      * @param ActivationToken $activationToken
      * @return string Le nouveau token en clair (à envoyer si besoin)
+     * @throws \Exception
      */
-    public function regenerateToken(ActivationToken $activationToken): string
+    public function regenerateToken(ActivationToken $oldActivationToken): string
     {
-        // Nouveau token en clair
-        $plainToken = bin2hex(random_bytes(32));
+        $oldActivationToken->setExpiredAt(new \DateTimeImmutable());
 
-        // Réinitialiser avec de nouvelles valeurs
-        $activationToken->setHashedToken(hash('sha256', $plainToken));
-        $activationToken->setCreatedAt(new \DateTimeImmutable());
-        $activationToken->setExpiredAt(null); // On remet à null → valide tant qu’il n’est pas dépassé
+        $newPlainToken = bin2hex(random_bytes(32));
+        $newHashedToken = hash('sha256', data: $newPlainToken);
 
-        $this->entityManager->persist($activationToken);
+        $newToken = new ActivationToken();
+        $newToken->setAccount($oldActivationToken->getAccount());
+        $newToken->setHashedToken($newHashedToken);
+        $newToken->setCreatedAt(new \DateTimeImmutable());
+        $newToken->setExpiredAt(null);
 
-        return $plainToken;
+        $this->entityManager->persist($newToken);
+        $this->entityManager->flush();
+
+        return $newPlainToken;
     }
-
 
     /**
      * Retrieves a valid activation token for the given user.
@@ -94,31 +98,32 @@ class ActivationService
 
     /**
      * Activates a user account based on the provided token.
-     *
-     * @param string $token The activation token.
-     * @return string 'success', 'expired', 'invalid'
+     * Returns an array with status and the token entity if applicable.
+     * @param string $plainToken The activation token in plain text.
+     * @return array An associative array with 'status' (success, expired, invalid)
      */
-    public function activateAccount(string $plainToken): string
+    public function activateAccount(string $plainToken): array
     {
+        $plainToken = trim($plainToken);
+
         // Hash the provided token to match the stored format
         $hashedToken = hash('sha256', $plainToken);
         
         $activationToken = $this->entityManager->getRepository(ActivationToken::class)
             ->findOneBy(['hashedToken' => $hashedToken]);
-
+            
         if (!$activationToken) {
-            return 'invalid';
+            return ['status' => 'invalid', 'token' => null];
         }
 
         if ($activationToken->isExpired()) {
-            return 'expired';
+            return ['status' => 'expired', 'token' => $activationToken];
         }
 
         $user = $activationToken->getAccount();
         
         // Activer le compte utilisateur
         $user->setIsActivated(true);
-
 
         // Remove all tokens associated with the user
         $tokens = $this->entityManager->getRepository(ActivationToken::class)
@@ -129,8 +134,7 @@ class ActivationService
         }
 
         $this->entityManager->flush();
-
-        return 'success';
+        return ['status' => 'success', 'token' => $activationToken];
     }
 
     /**
@@ -145,8 +149,8 @@ class ActivationService
             SELECT id
             FROM activation_token
             WHERE expired_at IS NULL
-            AND created_at < NOW() - INTERVAL '1 hour'
-            ORDER BY created_at ASC
+            AND created_at < NOW() - INTERVAL '5 minutes'
+            ORDER BY created_at DESC
             LIMIT 50
         ";
 
@@ -165,11 +169,8 @@ class ActivationService
             // Si l'utilisateur n'est pas activé
             if (!$user->isActivated()) {
 
-                // Marquer l'ancien token comme expiré
-                $token->setExpiredAt(new \DateTimeImmutable());
-
                 // Générer un nouveau token dans le même enregistrement
-               $this->regenerateToken($token);
+                $this->regenerateToken(oldActivationToken: $token);
 
                $updatedIds[] = $token->getId();
             }

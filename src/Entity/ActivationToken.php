@@ -82,7 +82,7 @@ class ActivationToken
 
     public function isExpired(): bool
     {
-        return $this->expiredAt !== null && $this->expiredAt < new \DateTimeImmutable();
+            return $this->expiredAt !== null && $this->expiredAt < new \DateTimeImmutable();
     }
 
     public function isValid(): bool

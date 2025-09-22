@@ -44,16 +44,14 @@ final class UserController extends AbstractController
     public function activate(string $token, ActivationService $activationService,MailerService $mailerService,
     EntityManagerInterface $em): Response
     {
-        // Nettoyage du token reçu
     $plainToken = trim($token);
-    $hashedToken = hash('sha256', $plainToken);
-
     $results = $activationService->activateAccount($plainToken);
 
     switch ($results['status']) {
         case 'success':
             return $this->redirect("{$this->frontendLoginUrl}?activated=1");
-
+        case 'already_activated':
+            return $this->redirect("{$this->frontendLoginUrl}?activated=1&info=already_activated");
         case 'expired':
             $tokenExpired = $results['token']; // objet ActivationToken
             $user = $tokenExpired->getAccount();
@@ -69,8 +67,13 @@ final class UserController extends AbstractController
                 true
             );
 
-            return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=token_expired&resend=1");
+            $user->setResendCount($user->getResendCount() + 1);
+            $user->setIsResend(true);
+            $em->flush();
 
+            return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=token_expired&resend={$user->getResendCount()}");
+        case 'blocked':
+            return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=max_resend_reached");
         case 'invalid':
         default:
             return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=invalid_token");
@@ -96,9 +99,9 @@ final class UserController extends AbstractController
             return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=user_not_found");
         }
 
-        if ($user->isActivated()) {
+        /*if ($user->isActivated()) {
             return $this->redirect("{$this->frontendLoginUrl}?activated=1&info=already_activated");
-        }
+        }*/
 
         // Générer un nouveau token
         $token = $activationService->generateToken($user);

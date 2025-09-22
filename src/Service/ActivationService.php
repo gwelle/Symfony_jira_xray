@@ -111,17 +111,27 @@ class ActivationService
         
         $activationToken = $this->entityManager->getRepository(ActivationToken::class)
             ->findOneBy(['hashedToken' => $hashedToken]);
-            
+
         if (!$activationToken) {
             return ['status' => 'invalid', 'token' => null];
         }
 
+        //Current user
+        $user = $activationToken->getAccount();
+
+        if($user->isActivated()){
+            return ['status' => 'already_activated', 'token' => null];
+        }
+            
         if ($activationToken->isExpired()) {
+
+            // check if user has already requested 3 times a new token
+            if($user->isResend() && $user->getResendCount() >= 2){
+                return ['status' => 'blocked', 'token' => null];
+            }
             return ['status' => 'expired', 'token' => $activationToken];
         }
 
-        $user = $activationToken->getAccount();
-        
         // Activer le compte utilisateur
         $user->setIsActivated(true);
 

@@ -128,6 +128,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups([self::GROUP_READ])]
     private Collection $activationTokens;
 
+    #[ORM\Column(type: 'boolean', nullable: false, options: ['default' => false])]
+    private ?bool $isResend = false;
+
+    #[ORM\Column(type: 'integer', nullable: false, options: ['default' => 0])]
+    private ?int $resendCount = 0;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -302,6 +308,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             // set the owning side to null (unless already changed)
             $activationToken->setAccount(null);
         }
+
+        return $this;
+    }
+
+    public function isResend(): ?bool
+    {
+        return $this->isResend;
+    }
+
+    public function setIsResend(?bool $isResend): static
+    {
+        $this->isResend = $isResend;
+
+        return $this;
+    }
+
+    public function getResendCount(): ?int
+    {
+        return $this->resendCount;
+    }
+
+    public function setResendCount(?int $resendCount): static
+    {
+        $this->resendCount = $resendCount;
 
         return $this;
     }

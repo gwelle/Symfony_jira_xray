@@ -3,6 +3,7 @@ namespace App\Service;
 use App\Entity\ActivationToken;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Entity\User;
+use App\Entity\LastActivationToken;
 
 class ActivationService
 {
@@ -113,15 +114,24 @@ class ActivationService
             ->findOneBy(['hashedToken' => $hashedToken]);
 
         if (!$activationToken) {
+        
+            // 2. Token inexistant -> check dans LastActivationToken
+            $lastToken = $this->entityManager->getRepository(LastActivationToken::class)
+                ->findOneBy(['hashedToken' => $hashedToken]);
+
+            if ($lastToken) {
+                $user = $lastToken->getAccount();
+                if ($user->isActivated()) {
+                    return ['status' => 'already_activated', 'token' => null];
+                }
+            }
+
+            // Ni token actif, ni archive -> invalid
             return ['status' => 'invalid', 'token' => null];
-        }
+    }
 
         //Current user
         $user = $activationToken->getAccount();
-
-        if($user->isActivated()){
-            return ['status' => 'already_activated', 'token' => null];
-        }
             
         if ($activationToken->isExpired()) {
 
@@ -139,10 +149,17 @@ class ActivationService
         $tokens = $this->entityManager->getRepository(ActivationToken::class)
         ->findBy(['account' => $user]);
 
+        //Rechercher le dernier token de l'utilisateur et l'archiver
+        if(!empty($tokens)){
+            $lastToken = end($tokens);
+            $lastToken->setExpiredAt(new \DateTimeImmutable());
+            $this->archiveLastToken($activationToken);
+        }   
+
+       // Supprimer tous les autres tokens
         foreach ($tokens as $token) {
             $this->entityManager->remove($token);
         }
-
         $this->entityManager->flush();
         return ['status' => 'success', 'token' => $activationToken];
     }
@@ -188,4 +205,21 @@ class ActivationService
         $this->entityManager->flush();
         return $updatedIds;
     }
+
+    /** 
+     * Archives the last used or expired token into LastActivationToken entity.
+     * @param ActivationToken $token The activation token to archive.
+     */
+    private function archiveLastToken(ActivationToken $token): void
+    {
+        $lastToken = new LastActivationToken();
+        $lastToken->setAccount($token->getAccount());
+        $lastToken->setHashedToken($token->getHashedToken());
+        $lastToken->setCreatedAt($token->getCreatedAt());
+        $lastToken->setExpiredAt($token->getExpiredAt());
+
+        $this->entityManager->persist($lastToken);
+        $this->entityManager->flush();
+
+    }   
 }

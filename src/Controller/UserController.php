@@ -11,6 +11,7 @@ use App\Service\ActivationService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Service\MailerService;
+use Symfony\Component\Validator\Constraints\Json;
 
 final class UserController extends AbstractController
 {
@@ -66,7 +67,7 @@ final class UserController extends AbstractController
                 $user->getFirstName().' '.$user->getLastName(),
                 true
             );
-
+            
             $user->setResendCount($user->getResendCount() + 1);
             $user->setIsResend(true);
             $em->flush();

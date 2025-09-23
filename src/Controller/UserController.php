@@ -34,7 +34,6 @@ final class UserController extends AbstractController
     /**
      * Activates a user account based on the provided token.
      * Redirects to the frontend login page with activation status.
-     *
      * @param string $token The activation token from the URL.
      * @param ActivationService $activationService The service to handle activation logic.
      * @param MailerService $mailerService The service to send emails.
@@ -67,12 +66,8 @@ final class UserController extends AbstractController
                 $user->getFirstName().' '.$user->getLastName(),
                 true
             );
-            
-            $user->setResendCount($user->getResendCount() + 1);
-            $user->setIsResend(true);
-            $em->flush();
 
-            return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=token_expired&resend={$user->getResendCount()}");
+            return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=token_expired");
         case 'blocked':
             return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=max_resend_reached");
         case 'invalid':
@@ -99,10 +94,6 @@ final class UserController extends AbstractController
         if (!$user) {
             return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=user_not_found");
         }
-
-        /*if ($user->isActivated()) {
-            return $this->redirect("{$this->frontendLoginUrl}?activated=1&info=already_activated");
-        }*/
 
         // Générer un nouveau token
         $token = $activationService->generateToken($user);

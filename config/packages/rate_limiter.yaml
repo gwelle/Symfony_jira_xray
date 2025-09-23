@@ -1,0 +1,11 @@
+framework:
+    rate_limiter:
+        token_expired_limiter:
+            policy: 'fixed_window'
+            limit: 2
+            interval: '5 minutes'
+
+        token_invalid_limiter:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '10 minutes'

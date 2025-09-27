@@ -12,16 +12,13 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Service\MailerService;
 use Symfony\Component\Validator\Constraints\Json;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 final class UserController extends AbstractController
 {
-
-    private string $frontendLoginUrl;
-
-    public function __construct()
-    {
-        $this->frontendLoginUrl = $_ENV['URL_LOGIN_FRONT'].'/login';
-    }
     /**
      * Redirects to the API endpoint.
      */
@@ -49,9 +46,9 @@ final class UserController extends AbstractController
 
     switch ($results['status']) {
         case 'success':
-            return $this->redirect("{$this->frontendLoginUrl}?activated=1");
+            return $this->redirectToFrontend(['activated' => 1]);
         case 'already_activated':
-            return $this->redirect("{$this->frontendLoginUrl}?activated=1&info=already_activated");
+            return $this->redirectToFrontend(['activated' => 1, 'info' => 'already_activated']);
         case 'expired':
             $tokenExpired = $results['token']; // objet ActivationToken
             $user = $tokenExpired->getAccount();
@@ -67,36 +64,61 @@ final class UserController extends AbstractController
                 true
             );
 
-            return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=token_expired");
+            return $this->redirectToFrontend(['activated' => 0, 'error' => 'token_expired']);
         case 'blocked':
-            return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=max_resend_reached");
+            return $this->redirectToFrontend(['activated' => 0, 'error' => 'max_resend_reached']);
         case 'invalid':
         default:
-            return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=invalid_token");
+            return $this->redirectToFrontend(['activated' => 0, 'error' => 'invalid_token']);
         }
     }
 
     /**
      * Resends the activation email to the user with a new token.
-     *
-     * @param string $email The email address of the user requesting a new activation email.
+     * @param Request $request The HTTP request containing the email in the JSON body.
      * @param ActivationService $activationService The service to handle activation logic.
      * @param MailerService $mailerService The service to send emails.
      * @param EntityManagerInterface $em The entity manager for database operations.
+     * @param RateLimiterFactory $tokenInvalidLimiter The rate limiter to prevent abuse.
      * @return JsonResponse A JSON response indicating success or failure of the operation.
      */
-    #[Route('/api/users/resend_activation_account/{email}', name: 'user_resend_activation', methods: ['GET', 'POST'])]
-    public function resendActivation(string $email, ActivationService $activationService,
-        MailerService $mailerService, EntityManagerInterface $em): Response {
+    #[Route('/api/users/resend_activation_account', name: 'user_resend_activation', methods: ['POST'])]
+    public function resendActivation(Request $request, ActivationService $activationService,
+        MailerService $mailerService, EntityManagerInterface $em,
+        #[Autowire(service: 'limiter.token_invalid_limiter')]
+        RateLimiterFactory $tokenInvalidLimiter): Response {
 
-        $user = $em->getRepository(User::class)->findOneBy(['email' => $email]);
+        // Extraire l’email de la requête JSON
+        $data = json_decode($request->getContent(), true);
+        $email = $data['email'] ?? null;
+
+        // Vérifier que l’email est fourni et valide 
+        // et que l’utilisateur existe et n’est pas encore activé
+        $user = $em->getRepository(User::class)->findOneBy([
+            'email' => $email,
+            'isActivated' => false
+        ]);
 
         if (!$user) {
-            return $this->redirect("{$this->frontendLoginUrl}?activated=0&error=user_not_found");
+            return $this->json([
+            'status' => 'handled',
+            'info' => 'check_resend_email'
+            ],404);
         }
 
         // Générer un nouveau token
         $token = $activationService->generateToken($user);
+
+        // Appliquer le rate limiter
+        $limiter = $tokenInvalidLimiter->create($email);
+
+        // Vérifier si la limite est atteinte
+        if (!$limiter->consume(1)->isAccepted()) {
+            return $this->json([
+                'status' => 'error',
+                'error' => 'max_resend_reached'
+            ],429);
+        }
 
         // Renvoyer l’e-mail
         $mailerService->sendConfirmationEmail(
@@ -105,8 +127,10 @@ final class UserController extends AbstractController
             $user->getFirstName().' '.$user->getLastName(),
             true // Indique que c'est un renvoi
         );
-
-        return new JsonResponse(['message' => 'Un nouvel e-mail de confirmation a été envoyé.']);
+        return $this->json([
+            'status' => 'resend',
+            'info' => 'check_resend_email'
+        ],200);
     }
 
     /**
@@ -120,12 +144,11 @@ final class UserController extends AbstractController
         // Appelle la méthode pour rafraîchir les tokens expirés
         $results = $activationService->refreshExpiredTokens();
         
-
         return new JsonResponse([
             'status' => 'success',
             'message' => 'Tokens refreshed',
             'data' => $results,
-        ]);
+        ], 200);
     }
 
     /**
@@ -143,6 +166,19 @@ final class UserController extends AbstractController
             'user' => $user->getEmail(),
             'token' => $token->getHashedToken(),
             'expiresAt' => $token->getExpiredAt(),
-        ]);
+        ], 200);
+    }
+
+    /**
+     * Redirects to the frontend login page with optional query parameters.
+     * @param array $params Optional query parameters to append to the URL.
+     * @return RedirectResponse A redirect response to the frontend login page.
+     */
+    private function redirectToFrontend(array $params = []): RedirectResponse
+    {
+        $frontendLoginUrl = $_ENV['URL_LOGIN_FRONT'].'/login';
+        // Append any additional query parameters encoded and securely
+        return $this->redirect($frontendLoginUrl . '?' . http_build_query($params));
     }
 }
+

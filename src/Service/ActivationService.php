@@ -19,7 +19,6 @@ class ActivationService
      */
     public function __construct(EntityManagerInterface $entityManager,
      #[Autowire(service: 'limiter.token_expired_limiter')]
-
      RateLimiterFactory $tokenExpiredLimiter)
     {
         $this->entityManager = $entityManager;
@@ -92,7 +91,6 @@ class ActivationService
                 ['account' => $user],
                 ['createdAt' => 'DESC']
         );
-
 
         if (!$token || !$token->isValid()) {
             $plainToken = $this->generateToken($user); // retourne le token en clair
@@ -189,18 +187,18 @@ class ActivationService
     }
 
     /**
-    * Refreshes activation tokens for users who haven't activated their account after 1 hour.
+    * Refreshes activation tokens for users who haven't activated their account after 24 hours.
     * Updates the existing token in place, setting a new creation date and hashed token.
     */
     public function refreshExpiredTokens(): array{
-        // Récupérer tous les tokens sans date d'expiration et créés il y a plus d'1h
+        // Récupérer tous les tokens sans date d'expiration et créés il y a plus de 24 heures
         $connection = $this->entityManager->getConnection();
 
         $sql = "
             SELECT id
             FROM activation_token
             WHERE expired_at IS NULL
-            AND created_at < NOW() - INTERVAL '5 minutes'
+            AND created_at < NOW() - INTERVAL '24 hours'
             ORDER BY created_at DESC
             LIMIT 50
         ";

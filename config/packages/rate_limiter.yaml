@@ -7,5 +7,5 @@ framework:
 
         token_invalid_limiter:
             policy: 'sliding_window'
-            limit: 5
+            limit: 2
             interval: '10 minutes'

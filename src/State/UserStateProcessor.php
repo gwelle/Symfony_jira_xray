@@ -9,6 +9,9 @@ use ApiPlatform\State\ProcessorInterface;
 use App\Service\ActivationService;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use App\Service\MailerService;
+use Symfony\Component\Messenger\MessageBusInterface;
+use App\Message\SendConfirmationEmail;
+
 
 class UserStateProcessor implements ProcessorInterface
 {
@@ -22,7 +25,8 @@ class UserStateProcessor implements ProcessorInterface
         private ProcessorInterface $processor,
         private UserPasswordHasherInterface $passwordHasher,
         private ActivationService $activationService,
-        private MailerService $mailerService
+        private MailerService $mailerService,
+        private MessageBusInterface $bus,
     ) {}
 
     /**
@@ -56,12 +60,12 @@ class UserStateProcessor implements ProcessorInterface
             $token = $this->activationService->generateToken($user);
 
             // Send the confirmation email with the token
-            $this->mailerService->sendConfirmationEmail(
+            $this->bus->dispatch(new SendConfirmationEmail(
                 $user->getEmail(),
                 $token,
                 $user->getFirstName().' '.$user->getLastName(),
                 false // Indique que ce n'est pas un renvoi
-            );
+            ));
 
             return $user ;
         }

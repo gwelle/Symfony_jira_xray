@@ -3,7 +3,7 @@ framework:
         default_bus: messenger.bus.default
         transports:
             async: # nom du transport
-                dsn: 'doctrine://default' # utilise ta base de données
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%' # utilise ta base de données
                 options:
                     table_name: messenger_messages
         routing:

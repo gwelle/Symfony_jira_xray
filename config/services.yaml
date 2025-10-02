@@ -31,6 +31,7 @@ services:
             $processor: '@api_platform.doctrine.orm.state.persist_processor'
             $passwordHasher: '@security.user_password_hasher'
             $activationService: '@App\Service\ActivationService'
+            
 
         tags:
             - { name: 'api_platform.state_processor', priority: 20 }

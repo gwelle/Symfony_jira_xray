@@ -4,13 +4,13 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use App\Entity\User;
-
 use ApiPlatform\State\ProcessorInterface;
 use App\Service\ActivationService;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use App\Service\MailerService;
 use Symfony\Component\Messenger\MessageBusInterface;
 use App\Message\SendConfirmationEmail;
+use App\Message\GenerateUserTokenAndSendEmail;
 
 
 class UserStateProcessor implements ProcessorInterface
@@ -20,13 +20,13 @@ class UserStateProcessor implements ProcessorInterface
      * @param ProcessorInterface $processor The next processor in the chain.
      * @param UserPasswordHasherInterface $passwordHasher The password hasher service.
      * @param ActivationService $activationService The activation service for generating tokens.
+     * @param MessageBusInterface $bus The message bus for dispatching messages.
      */
     public function __construct(
         private ProcessorInterface $processor,
         private UserPasswordHasherInterface $passwordHasher,
         private ActivationService $activationService,
-        private MailerService $mailerService,
-        private MessageBusInterface $bus,
+        private MessageBusInterface $bus
     ) {}
 
     /**
@@ -56,10 +56,10 @@ class UserStateProcessor implements ProcessorInterface
 
             $user = $this->processor->process($data, $operation, $uriVariables, $context);
 
-            // Generate and persist the activation token
+            // Generate token
             $token = $this->activationService->generateToken($user);
 
-            // Send the confirmation email with the token
+            // Send the confirmation email
             $this->bus->dispatch(new SendConfirmationEmail(
                 $user->getEmail(),
                 $token,

@@ -161,12 +161,7 @@ final class UserController extends AbstractController
     public function getTokenForUser(User $user, ActivationService $activationService): JsonResponse
     {
         $token = $activationService->getValidTokenForUser($user);
-    
-        return $this->json([
-            'user' => $user->getEmail(),
-            'token' => $token->getHashedToken(),
-            'expiresAt' => $token->getExpiredAt(),
-        ], 200);
+        return $this->json(['token' => $token->getHashedToken()], 200);
     }
 
     /**

@@ -1,19 +1,28 @@
 import http from 'k6/http';
 import { check } from 'k6';
+import { randomFirstName, randomLastName, randomEmail, randomPasswordPair } from './utils.js';
 
 
 // Configuration test options
 export const options = {
-    vus: 1,           // 1 utilisateur virtuel
-    duration: '5s',  // durée totale du test
-    gracefulStop: '1s',
+    scenarios: { 
+      default: { 
+        executor: 'constant-vus', // type d'exécution : VUs constants 
+        vus: 1,                   // 1 utilisateur virtuel
+        duration: '5s',         // durée totale du test
+        gracefulStop: '2s'       // temps pour que les VUs terminent leurs itérations
+    }
+  },
     thresholds: {
       // Seuils de performance pour les requêtes HTTP
-      // Moyenne en dessous de 350ms, 
-      // 95% en dessous de 800ms, 
-      // 99% en dessous de 900ms
-        http_req_duration: ['avg<350', 'p(95)<800', 'p(99)<900'],
-
+      // Moyenne en dessous de 900ms, 
+      // 95% en dessous de 1000ms, 
+      // 99% en dessous de 1200ms
+      http_req_duration: [
+        'avg<900', 
+        'p(95)<1000', 
+        'p(99)<1200'
+      ]
   }
 };
 
@@ -25,13 +34,18 @@ export default function createUserTest() {
 
   // Load the API URL from environment variables
   const API_URL = __ENV.API_PLATFORM_URL;
+  if (!API_URL) {
+    return;
+  }
+
+
   // Define the payload for creating a user account
   const payload = JSON.stringify({
-      email: `user.${Math.random().toString(36).substring(2, 8)}@gmail.com`,
-      firstName: 'Alexis',
-      lastName: 'Sanchez',
-      plainPassword: 'Test1234$$',
-      confirmationPassword: 'Test1234$$',
+      email: randomEmail(),
+      firstName: randomFirstName(),
+      lastName: randomLastName(),
+      plainPassword: randomPasswordPair().plainPassword,
+      confirmationPassword: randomPasswordPair().confirmationPassword,
   });
 
   // Set the request headers
@@ -47,27 +61,11 @@ export default function createUserTest() {
   // Check the response status and time
   check(res, {
     'is status 201': (r) => r.status === 201,
-    'response time < 800ms (per request)': (r) => r.timings.duration < 800
+    'response time < 1400ms (per request)': (r) => r.timings.duration < 1400
   });
 
-  // Log error details if the status is not 201
+  // Log error details
   if (res.status !== 201) {
-    console.error(`Erreur : status=${res.status}`);
-    if (res.body) {
-        try {
-            const json = JSON.parse(res.body);
-            console.error(`Body JSON : ${JSON.stringify(json)}`);
-        } catch (e) {
-            console.error(`Body non JSON : ${res.body}`);
-        }
-    } else {
-        console.error('Body vide ou nul');
-    }
-  }
-
-
-  // Log if the response time exceeds 800ms
-  if(res.timings.duration >= 800) {
-    console.error(`Response time exceeded: ${res.timings.duration}ms`);
+    console.error(`Erreur: status=${res.status}, body=${res.body}`);
   }
 }

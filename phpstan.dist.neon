@@ -5,4 +5,5 @@ parameters:
         - config/
         - public/
         - src/
+        - tests/
     tmpDir: var/cache/phpstan

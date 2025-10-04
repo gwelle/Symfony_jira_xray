@@ -10,7 +10,6 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use App\Service\MailerService;
 use Symfony\Component\Messenger\MessageBusInterface;
 use App\Message\SendConfirmationEmail;
-use App\Message\GenerateUserTokenAndSendEmail;
 
 
 class UserStateProcessor implements ProcessorInterface
@@ -56,7 +55,6 @@ class UserStateProcessor implements ProcessorInterface
 
             $user = $this->processor->process($data, $operation, $uriVariables, $context);
 
-            // Generate token
             $token = $this->activationService->generateToken($user);
 
             // Send the confirmation email

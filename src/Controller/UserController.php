@@ -2,23 +2,38 @@
 
 namespace App\Controller;
 
-use App\Entity\ActivationToken;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use App\Entity\User;
 use App\Service\ActivationService;
+use App\Service\MailerService;
+use App\Message\SendConfirmationEmail;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Doctrine\ORM\EntityManagerInterface;
-use App\Service\MailerService;
-use Symfony\Component\Validator\Constraints\Json;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 final class UserController extends AbstractController
 {
+
+    /**
+     * Summary of __construct
+     * @param \App\Service\ActivationService $activationService
+     * @param \App\Service\MailerService $mailerService
+     * @param \Doctrine\ORM\EntityManagerInterface $em
+     * @param \Symfony\Component\Messenger\MessageBusInterface $bus
+     */
+    public function __construct(
+        private ActivationService $activationService,
+        private MailerService $mailerService,
+        private EntityManagerInterface $em,
+        private MessageBusInterface $bus
+    ) {}
+
     /**
      * Redirects to the API endpoint.
      */
@@ -32,59 +47,49 @@ final class UserController extends AbstractController
      * Activates a user account based on the provided token.
      * Redirects to the frontend login page with activation status.
      * @param string $token The activation token from the URL.
-     * @param ActivationService $activationService The service to handle activation logic.
-     * @param MailerService $mailerService The service to send emails.
-     * @param EntityManagerInterface $em The entity manager for database operations.
      * @return Response A redirect response to the frontend login page with query parameters indicating success or failure.
      */
     #[Route('/api/users/activate_account/{token}', name: 'user_activate', methods: ['GET'])]
-    public function activate(string $token, ActivationService $activationService,MailerService $mailerService,
-    EntityManagerInterface $em): Response
+    public function activate(string $token): Response
     {
-    $plainToken = trim($token);
-    $results = $activationService->activateAccount($plainToken);
+    $results = $this->activationService->activateAccount($token);
 
     switch ($results['status']) {
         case 'success':
-            return $this->redirectToFrontend(['activated' => 1]);
+            return $this->json(['success' => 'Compte activé'], 200);
         case 'already_activated':
-            return $this->redirectToFrontend(['activated' => 1, 'info' => 'already_activated']);
+            return $this->json(['info' => 'already_activated'], 200);
         case 'expired':
             $tokenExpired = $results['token']; // objet ActivationToken
             $user = $tokenExpired->getAccount();
 
             // Génération nouveau token
-            $newToken = $activationService->generateToken($user);
+            $newToken = $this->activationService->generateToken($user);
 
             // Envoi email de confirmation
-            $mailerService->sendConfirmationEmail(
+            $this->bus->dispatch(new SendConfirmationEmail(
                 $user->getEmail(),
                 $newToken,
                 $user->getFirstName().' '.$user->getLastName(),
                 true
-            );
-
-            return $this->redirectToFrontend(['activated' => 0, 'error' => 'token_expired']);
+            ));
+            return $this->json(['error' => 'token_expired'], 400);
         case 'blocked':
-            return $this->redirectToFrontend(['activated' => 0, 'error' => 'max_resend_reached']);
+            return $this->json(['error' => 'max_resend_reached'], 429);
         case 'invalid':
         default:
-            return $this->redirectToFrontend(['activated' => 0, 'error' => 'invalid_token']);
+            return $this->json(['error' => 'invalid_token'], 400);
         }
     }
 
     /**
      * Resends the activation email to the user with a new token.
      * @param Request $request The HTTP request containing the email in the JSON body.
-     * @param ActivationService $activationService The service to handle activation logic.
-     * @param MailerService $mailerService The service to send emails.
-     * @param EntityManagerInterface $em The entity manager for database operations.
      * @param RateLimiterFactory $tokenInvalidLimiter The rate limiter to prevent abuse.
      * @return JsonResponse A JSON response indicating success or failure of the operation.
      */
     #[Route('/api/users/resend_activation_account', name: 'user_resend_activation', methods: ['POST'])]
-    public function resendActivation(Request $request, ActivationService $activationService,
-        MailerService $mailerService, EntityManagerInterface $em,
+    public function resendActivation(Request $request,
         #[Autowire(service: 'limiter.token_invalid_limiter')]
         RateLimiterFactory $tokenInvalidLimiter): Response {
 
@@ -94,7 +99,7 @@ final class UserController extends AbstractController
 
         // Vérifier que l’email est fourni et valide 
         // et que l’utilisateur existe et n’est pas encore activé
-        $user = $em->getRepository(User::class)->findOneBy([
+        $user = $this->em->getRepository(User::class)->findOneBy([
             'email' => $email,
             'isActivated' => false
         ]);
@@ -107,7 +112,7 @@ final class UserController extends AbstractController
         }
 
         // Générer un nouveau token
-        $token = $activationService->generateToken($user);
+        $token = $this->activationService->generateToken($user);
 
         // Appliquer le rate limiter
         $limiter = $tokenInvalidLimiter->create($email);
@@ -121,12 +126,13 @@ final class UserController extends AbstractController
         }
 
         // Renvoyer l’e-mail
-        $mailerService->sendConfirmationEmail(
-            $user->getEmail(),
-            $token,
-            $user->getFirstName().' '.$user->getLastName(),
-            true // Indique que c'est un renvoi
-        );
+        $this->bus->dispatch(new SendConfirmationEmail(
+                $user->getEmail(),
+                $token,
+                $user->getFirstName().' '.$user->getLastName(),
+                true
+        ));
+
         return $this->json([
             'status' => 'resend',
             'info' => 'check_resend_email'
@@ -135,15 +141,14 @@ final class UserController extends AbstractController
 
     /**
      * Refreshes expired activation tokens for users who haven't activated their accounts.
-     * @param ActivationService $activationService The service to handle activation logic.
      * @return JsonResponse A JSON response indicating the result of the token refresh operation.
      */
     #[Route('/api/users/refresh_tokens', name: 'refresh_tokens', methods: ['POST'])]
-    public function refreshExpiredTokens(ActivationService $activationService): JsonResponse
+    public function refreshExpiredTokens(): JsonResponse
     {
         // Appelle la méthode pour rafraîchir les tokens expirés
-        $results = $activationService->refreshExpiredTokens();
-        
+        $results = $this->activationService->refreshExpiredTokens();
+
         return new JsonResponse([
             'status' => 'success',
             'message' => 'Tokens refreshed',
@@ -152,16 +157,18 @@ final class UserController extends AbstractController
     }
 
     /**
-     * Fetches a valid activation token for the specified user.
+     * Retrieves the activation token for a specific user.
      * @param User $user
-     * @param ActivationService $activationService
      * @return JsonResponse
      */
     #[Route('/api/users/{id}/token', methods: ['GET'])]
-    public function getTokenForUser(User $user, ActivationService $activationService): JsonResponse
+    public function getTokenForUser(User $user): JsonResponse
     {
-        $token = $activationService->getValidTokenForUser($user);
-        return $this->json(['token' => $token->getHashedToken()], 200);
+        $token = $this->activationService->getValidTokenForUser($user);
+        if( !$token ) {
+            return $this->json(['error' => 'User notfound'], 404);
+        }
+        return $this->json(['token' => $token], 200);
     }
 
     /**
@@ -176,4 +183,3 @@ final class UserController extends AbstractController
         return $this->redirect($frontendLoginUrl . '?' . http_build_query($params));
     }
 }
-

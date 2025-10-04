@@ -1,27 +1,27 @@
 import http from 'k6/http';
-import { check } from 'k6';
+import { check, fail } from 'k6';
 import { randomFirstName, randomLastName, randomEmail, randomPasswordPair } from './utils.js';
 
 
 // Configuration test options
 export const options = {
     scenarios: { 
-      default: { 
-        executor: 'constant-vus', // type d'exécution : VUs constants 
+      creation_account: { 
+        executor: 'per-vu-iterations', // type d'exécution : per-vu-iterations
         vus: 1,                   // 1 utilisateur virtuel
-        duration: '5s',         // durée totale du test
-        gracefulStop: '2s'       // temps pour que les VUs terminent leurs itérations
+        iterations: 1,            // une itération
+        gracefulStop: '500ms'       // temps pour que les VUs terminent leurs itérations
     }
   },
     thresholds: {
       // Seuils de performance pour les requêtes HTTP
-      // Moyenne en dessous de 900ms, 
-      // 95% en dessous de 1000ms, 
-      // 99% en dessous de 1200ms
+      // Moyenne en dessous de 800ms, 
+      // 95% en dessous de 850ms, 
+      // 99% en dessous de 900ms
       http_req_duration: [
-        'avg<900', 
-        'p(95)<1000', 
-        'p(99)<1200'
+        'avg<800', 
+        'p(95)<850', 
+        'p(99)<900'
       ]
   }
 };
@@ -61,11 +61,11 @@ export default function createUserTest() {
   // Check the response status and time
   check(res, {
     'is status 201': (r) => r.status === 201,
-    'response time < 1400ms (per request)': (r) => r.timings.duration < 1400
+    'response time < 1000ms (per request)': (r) => r.timings.duration < 1000
   });
 
   // Log error details
   if (res.status !== 201) {
-    console.error(`Erreur: status=${res.status}, body=${res.body}`);
+    fail(`Erreur: status=${res.status}, body=${res.body}`);
   }
 }

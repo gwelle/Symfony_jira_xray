@@ -19,7 +19,7 @@ class ActivationService
      */
     public function __construct(EntityManagerInterface $entityManager,
      #[Autowire(service: 'limiter.token_expired_limiter')]
-     RateLimiterFactory $tokenExpiredLimiter)
+     RateLimiterFactory $tokenExpiredLimiter) 
     {
         $this->entityManager = $entityManager;
         $this->tokenExpiredLimiter = $tokenExpiredLimiter;
@@ -41,6 +41,7 @@ class ActivationService
         $activationToken->setHashedToken(hash('sha256', $plainToken));
         $activationToken->setCreatedAt(new \DateTimeImmutable());
         $activationToken->setExpiredAt(null);
+        $tokenCacheService = new TokenCacheService();
 
         // Persist the token entity
         $this->entityManager->persist($activationToken);
@@ -78,50 +79,42 @@ class ActivationService
 
     /**
      * Retrieves a valid activation token for the given user.
-     * If no valid token exists, a new one is generated.
-     *
      * @param User $user The user for whom to retrieve the activation token.
      * @return ActivationToken A valid activation token entity.
      */
-    public function getValidTokenForUser(User $user): ActivationToken
+    public function getValidTokenForUser(User $user): ?string
     {
-        // Chercher le dernier token pour cet utilisateur
-        $token = $this->entityManager->getRepository(ActivationToken::class)
-            ->findOneBy(
-                ['account' => $user],
-                ['createdAt' => 'DESC']
-        );
+       $token = $this->entityManager->getRepository(ActivationToken::class)
+        ->createQueryBuilder('t')
+        ->select('t.hashedToken')
+        ->where('t.account = :user')
+        ->andWhere('t.expiredAt IS NULL')
+        ->setParameter('user', $user)
+        ->orderBy('t.createdAt', 'DESC')
+        ->setMaxResults(1)
+        ->getQuery()
+        ->getOneOrNullResult();
 
-        if (!$token || !$token->isValid()) {
-            $plainToken = $this->generateToken($user); // retourne le token en clair
-            $hashedToken = hash('sha256', $plainToken); // hash pour chercher en base
-            $token = $this->entityManager->getRepository(ActivationToken::class)
-                ->findOneBy(['hashedToken' => $hashedToken]); // récupère l'objet ActivationToken
-        }
-
-        return $token;
+        return $token ? $token['hashedToken'] : null;
     }
 
     /**
      * Activates a user account based on the provided token.
      * Returns an array with status and the token entity if applicable.
-     * @param string $plainToken The activation token in plain text.
+     * @param string $hashedToken The activation token in hashed form.
      * @return array An associative array with 'status' (success, expired, invalid)
      */
-    public function activateAccount(string $plainToken): array
+    public function activateAccount(string $hashedToken): array
     {
-        $plainToken = trim($plainToken);
+        // Trim any whitespace from the token
+        $hashedToken = trim($hashedToken);
 
-        // Hash the provided token to match the stored format
-        $hashedToken = hash('sha256', $plainToken);
-        
-        // 1. Chercher le token dans ActivationToken
+        // 1. Chercher le token **tel quel** dans la DB
         $activationToken = $this->entityManager->getRepository(ActivationToken::class)
             ->findOneBy(['hashedToken' => $hashedToken]);
 
         if (!$activationToken) {
-        
-            // 2. Token inexistant -> check dans LastActivationToken
+            // 2. Token inexistant → check LastActivationToken (optionnel)
             $lastToken = $this->entityManager->getRepository(LastActivationToken::class)
                 ->findOneBy(['hashedToken' => $hashedToken]);
 

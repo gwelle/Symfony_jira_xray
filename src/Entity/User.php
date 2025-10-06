@@ -9,6 +9,7 @@ use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Get;
 use App\State\UserStateProcessor;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Serializer\Annotation\Groups;
@@ -19,7 +20,9 @@ use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
         new Post(
             denormalizationContext: ['groups' => [self::GROUP_WRITE]],
             processor: UserStateProcessor::class,
-        )
+        ),
+        new Get(normalizationContext: ['groups' => [self::GROUP_READ]])
+        
     ]
 )]
 #[UniqueEntity(

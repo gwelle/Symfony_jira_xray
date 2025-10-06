@@ -41,7 +41,6 @@ class ActivationService
         $activationToken->setHashedToken(hash('sha256', $plainToken));
         $activationToken->setCreatedAt(new \DateTimeImmutable());
         $activationToken->setExpiredAt(null);
-        $tokenCacheService = new TokenCacheService();
 
         // Persist the token entity
         $this->entityManager->persist($activationToken);

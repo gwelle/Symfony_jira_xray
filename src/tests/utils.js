@@ -29,7 +29,7 @@ export function randomEmail(domain = 'gmail.com') {
 }
 
 // Génère un mot de passe robuste (ex : "Xy8$trQ!mn2")
-export function randomPassword(length = 8) {
+export function randomPassword(minLength = 8, maxLength = 15) {
   const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   const lower = 'abcdefghijklmnopqrstuvwxyz';
   const digits = '0123456789';
@@ -40,13 +40,12 @@ export function randomPassword(length = 8) {
 
   let pwd = '';
   do {
-    const length = Math.floor(Math.random() * (15 - 8 + 1)) + 8; // longueur entre 8 et 15
+    const len = Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength;
     pwd = '';
-    for (let i = 0; i < length; i++) {
+    for (let i = 0; i < len; i++) {
       pwd += all.charAt(Math.floor(Math.random() * all.length));
     }
-  } 
-  while (!regex.test(pwd));
+  } while (!regex.test(pwd));
 
   return pwd;
 }

@@ -1,0 +1,11 @@
+{
+  "type": "module",
+  "scripts": {
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest --runInBand"
+  },
+  "devDependencies": {
+    "dotenv": "^17.2.3",
+    "jest": "^29.7.0",
+    "node-fetch": "^3.3.2"
+  }
+}

@@ -14,6 +14,7 @@ use App\State\UserStateProcessor;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
+use Symfony\Component\Validator\Context\ExecutionContextInterface;
 
 #[ApiResource(
     operations: [
@@ -33,6 +34,7 @@ use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 #[ORM\Table(name: '`account`')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
 #[ORM\HasLifecycleCallbacks]
+#[Assert\Callback('validatePasswordsMatch')]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
 
@@ -71,7 +73,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Assert\NotBlank(message: 'Le prénom est obligatoire.')]
     #[Assert\NotNull(message: 'Le prénom ne peut pas être null.')]
     #[Assert\Regex(
-        pattern: '/^[\p{L}]+(?:[ \'-][\p{L}]+)*$/u',
+        pattern: '/^[\p{L}\p{M}]+(?:[ \'-][\p{L}\p{M}]+)*$/u',
         message: "Le prénom doit contenir uniquement des lettres, espaces, tirets ou apostrophes correctement placés."
     )]
     #[Groups([self::GROUP_WRITE,self::GROUP_READ])]
@@ -81,8 +83,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Assert\NotBlank(message: 'Le prénom est obligatoire.')]
     #[Assert\NotNull(message: 'Le prénom ne peut pas être null.')]
     #[Assert\Regex(
-        pattern: '/^[\p{L}]+(?:[ \'-][\p{L}]+)*$/u',
-            message: "Le nom ou prénom doit contenir uniquement des lettres, espaces, tirets ou apostrophes correctement placés."
+        pattern: '/^[\p{L}\p{M}]+(?:[ \'-][\p{L}\p{M}]+)*$/u',
+        message: "Le nom ou prénom doit contenir uniquement des lettres, espaces, tirets ou apostrophes correctement placés."
     )]
     #[Groups([self::GROUP_WRITE,self::GROUP_READ])]
     private ?string $lastName = null;
@@ -305,6 +307,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         }
 
         return $this;
+    }
+
+    /**
+     * Summary of validatePasswordsMatch
+     * @param \Symfony\Component\Validator\Context\ExecutionContextInterface $context
+     * @return void
+     */
+    public function validatePasswordsMatch(ExecutionContextInterface $context): void
+    {
+        if ($this->plainPassword !== $this->confirmationPassword) {
+            $context->buildViolation('The plain password and confirmation password do not match.')
+                ->atPath('confirmationPassword')
+                ->addViolation();
+        }
     }
 }
 

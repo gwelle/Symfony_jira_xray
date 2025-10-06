@@ -1,4 +1,4 @@
-// utils.js
+import fetch from 'node-fetch';
 
 // Génère une chaîne de caractères aléatoire
 export function randomString(length = 8, charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ') {
@@ -54,4 +54,34 @@ export function randomPassword(minLength = 8, maxLength = 15) {
 export function randomPasswordPair(length = 8) {
   const pwd = randomPassword(length);
   return { plainPassword: pwd, confirmationPassword: pwd };
+}
+
+/**
+ *  Crée un utilisateur via l'API
+ * @param {*} apiUrl 
+ * @param {*} overrides 
+ * @returns 
+ */
+export async function createUser(apiUrl, overrides = {}) {
+  const { plainPassword, confirmationPassword } = randomPasswordPair();
+
+  const payload = {
+    email: randomEmail(),
+    firstName: randomFirstName(),
+    lastName: randomLastName(),
+    plainPassword,
+    confirmationPassword,
+    ...overrides // permet d'écraser un champ pour un test précis
+  };
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/ld+json',
+      'Accept': 'application/ld+json'
+    },
+    body: JSON.stringify(payload)
+  });
+
+  return { response, payload };
 }

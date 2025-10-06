@@ -151,8 +151,7 @@ final class UserController extends AbstractController
 
         return new JsonResponse([
             'status' => 'success',
-            'message' => 'Tokens refreshed',
-            'data' => $results,
+            'message' => 'Tokens refreshed'
         ], 200);
     }
 
@@ -166,7 +165,7 @@ final class UserController extends AbstractController
     {
         $token = $this->activationService->getValidTokenForUser($user);
         if( !$token ) {
-            return $this->json(['error' => 'User notfound'], 404);
+            return $this->json(['error' => 'User not found'], 404);
         }
         return $this->json(['token' => $token], 200);
     }

@@ -1,5 +1,6 @@
 import { createUser } from '../../utils.js';
-import { randomFirstName, randomLastName, randomEmail, randomPasswordPair } from '../../utils.js';
+import { randomFirstName, randomPasswordPair } from '../../utils.js';
+import { storeUserId, getUserId } from '../../cache.js';
 // Récupérer la variable d'environnement
 const API_URL = process.env.API_PLATFORM_URL;
 if (!API_URL) {
@@ -48,6 +49,9 @@ if (!API_URL) {
           headers: { 'Content-Type': 'application/json' }
         });
 
+        // Stocke l'ID utilisateur dans le cache
+        storeUserId("newUser",data.id);
+
         const getData = await getResponse.json();
         expect(getResponse.status).toEqual(200);
         expect(getData.email).toBe(data.email);
@@ -78,7 +82,6 @@ if (!API_URL) {
         expect(typeof data.plainPassword).toBe('string');
         expect(typeof data.confirmationPassword).toBe('string');  
       });
-
 
       it('should return 422 Unprocessable Entity for invalid email', async () => {
         const { response } = await createUser(API_URL, { email: 'invalid-email' });

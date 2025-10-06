@@ -85,3 +85,19 @@ export async function createUser(apiUrl, overrides = {}) {
 
   return { response, payload };
 }
+
+/** Active un compte utilisateur via l'API
+ * @param {*} apiUrl 
+ * @param {*} activationToken 
+ * @returns 
+ */
+export async function activateUser(apiUrl, activationToken) {
+  const response = await fetch(`${apiUrl}/activate_account/${activationToken}`, {
+    method: 'GET',
+    headers: {
+      'Accept': 'application/ld+json, application/json, */*;q=0.8'
+    }
+  });
+
+  return { response };
+}

@@ -1,6 +1,6 @@
 import { createUser } from '../../utils.js';
 import { randomFirstName, randomPasswordPair } from '../../utils.js';
-import { storeUserId, getUserId } from '../../cache.js';
+
 // Récupérer la variable d'environnement
 const API_URL = process.env.API_PLATFORM_URL;
 if (!API_URL) {
@@ -48,9 +48,6 @@ if (!API_URL) {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
         });
-
-        // Stocke l'ID utilisateur dans le cache
-        storeUserId("newUser",data.id);
 
         const getData = await getResponse.json();
         expect(getResponse.status).toEqual(200);

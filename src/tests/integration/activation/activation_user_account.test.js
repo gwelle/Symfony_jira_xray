@@ -1,96 +1,125 @@
-import { activateUser } from '../../utils.js';
-import { storeUserId, getUserId, clearUserId } from '../../cache.js';
+import { activateUser, createUser, expectValidResponse, testActivateExpiredToken, resendEmailActivation } from '../../utils.js';
 
 // Récupérer les variable d'environnement
-const API_URL = process.env.API_PLATFORM_URL;
-const TOKEN_SUCCESS = process.env.TOKEN_SUCCESS;
-const TOKEN_INVALID = process.env.TOKEN_INVALID;
-const TOKEN_EXPIRED = process.env.TOKEN_EXPIRED;
+const apiUrl = process.env.API_PLATFORM_URL;
+const tokenInvalid = process.env.TOKEN_INVALID;
+const tokenExpired = process.env.TOKEN_EXPIRED;
+const fakeUserEmail = process.env.FAKE_USER_EMAIL;
 
-if (!API_URL || !TOKEN_SUCCESS || !TOKEN_INVALID || !TOKEN_EXPIRED) {
+if (!apiUrl || !tokenInvalid || !tokenExpired || !fakeUserEmail) {
   throw new Error('Environment variables are not defined');
 }
 
-// === Helpers génériques ===
-async function expectValidResponse(response, expectedStatus) {
-  expect(response.status).toBe(expectedStatus);
-
-  const text = await response.text();
-  const contentType = response.headers.get('content-type') || '';
-
-  if (!contentType.includes('json')) {
-    throw new Error(`Expected JSON but got: ${contentType}`);
-  }
-
-  return JSON.parse(text);
-}
-
-async function testActivateExpiredToken({ maxAttempts = 4 } = {}) {
-  for (let i = 0; i < maxAttempts; i++) {
-    const { response } = await activateUser(API_URL, TOKEN_EXPIRED);
-    const status = response.status;
-    const result = await response.json();
-
-    if (status === 400) {
-      // Token expiré
-      expect(result.error).toMatch(/token_expired/);
-    } 
-    else if (status === 429) {
-      // Limite atteinte
-      expect(result.error).toMatch(/max_resend_reached/);
-      break; // inutile de continuer
-    } else {
-      throw new Error(`Unexpected status ${status}: ${JSON.stringify(result)}`);
-    }
-    await new Promise(r => setTimeout(r, 300)); // pause facultative
-  }
-}
-// === Tests d’intégration ===
+let activationToken = "";
 
 describe('Activate User Account', () => {
+  it('should create user, retrieve token, and activate successfully', async () => {
 
-  afterAll(() => {
-    // Nettoie le cache après les tests
-    clearUserId("newUser");
-  });
+    // === Création d’un utilisateur ===
+    const { response: createResponse } = await createUser(apiUrl);
+    const userData = await createResponse.json();
+    expect(createResponse.status).toBe(201);
 
-  it('should return activated user account with success message', async () => {
-    const { response } = await activateUser(API_URL, TOKEN_SUCCESS);
+    // ===  Récupération du token pour ce user ===
+    const getResponse = await fetch(`${apiUrl}/${userData.id}/token`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const tokenData = await getResponse.json();
+    activationToken = tokenData.token;
+
+    expect(getResponse.status).toBe(200);
+    expect(tokenData).toHaveProperty('token');
+    expect(activationToken).toBeDefined();
+
+    const { response } = await activateUser(apiUrl, activationToken);
     const data = await expectValidResponse(response, 200);
 
-    if (data.success) {
-      expect(data.success).toMatch(/Compte activé/);
-    } 
-    else {
-      expect(data.info).toMatch(/already_activated/);
-    }
+    (data.success ? 
+      expect(data.success).toMatch(/Compte activé/) : expect(data.info).toMatch(/already_activated/)
+    );
   });
 
   it('should return a message already activated', async () => {
-    const { response } = await activateUser(API_URL, TOKEN_SUCCESS);
+    const { response } = await activateUser(apiUrl, activationToken);
     const data = await expectValidResponse(response, 200);
     expect(data.info).toMatch(/already_activated/);
   });
 
   it('should return a message invalid token', async () => {
-    const { response } = await activateUser(API_URL, TOKEN_INVALID);
+    const { response } = await activateUser(apiUrl, tokenInvalid);
     const data = await expectValidResponse(response, 400);
     expect(data.error).toMatch(/invalid_token/);
   });
 
   it('should return a message token expired', async () => {
-    const getResponse = await fetch(`${API_URL}/refresh_tokens`, {
+    const getResponse = await fetch(`${apiUrl}/refresh_tokens`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
     });
     const data = await expectValidResponse(getResponse, 200);
     expect(data.message).toMatch(/Tokens refreshed/);
 
-    await testActivateExpiredToken({ maxAttempts: 4 });
+    await testActivateExpiredToken({ apiUrl, tokenExpired, maxAttempts: 4 })
   });
 
   it('should return 429 after max refresh attempts', async () => {
-    await testActivateExpiredToken({ maxAttempts: 3 });
+      await testActivateExpiredToken({ apiUrl, tokenExpired, maxAttempts: 3 })
+  });
+
+  it('should create an user and resend activation email', async () => {
+
+    const { response: createResponse } = await createUser(apiUrl);
+    const userData = await createResponse.json();
+    expect(createResponse.status).toBe(201);
+
+    // Tester la limite de tentatives de renvoi d'email
+    let attempts = 0;           // emails valides envoyés
+    let totalAttempts = 0;      // toutes tentatives
+    const maxAttempts = 3;      // côté serveur
+    const maxTotalAttempts = 6; // limite pour éviter boucle infinie
+
+    // Tant que le nombre de tentatives valides est inférieur à la limite
+    // et que le nombre total de tentatives n’a pas dépassé le maximum
+    while (attempts < maxAttempts && totalAttempts < maxTotalAttempts) {
+      //const { response: resendResponse } = await resendEmailActivation(apiUrl, fakeUserEmail);
+      const { response: resendResponse } = await resendEmailActivation(apiUrl, userData.email);
+      const status = resendResponse.status;
+      const resendData = await expectValidResponse(resendResponse, [200, 404, 429]);
+
+      totalAttempts++; // Incrémente à chaque tentative
+
+      // Si le statut est 200, on incrémente les tentatives et on vérifie le message
+      if(resendResponse.status === 200) {
+        attempts++;
+        expect(resendData.status).toMatch(/resend/);
+        expect(resendData.info).toMatch(/check_resend_email/);
+      }
+      // Si le statut est 404, on vérifie le message et on continue la boucle
+      else if (status === 404) {
+        console.log(`Tentative ignorée (404)`);
+        expect(resendData.status).toMatch(/handled/);
+        expect(resendData.info).toMatch(/check_resend_email/);
+      }
+      // Si le statut est 429, on vérifie le message et on sort de la boucle
+      else if (status === 429) {
+        expect(resendData.status).toMatch(/error/);
+        expect(resendData.error).toMatch(/max_resend_reached/);
+        break;
+      }
+      else {
+        throw new Error(`Unexpected status ${status}: ${JSON.stringify(resendData)}`);
+      }
+
+      // petite pause pour éviter d’enchaîner trop vite
+      await new Promise(r => setTimeout(r, 300));
+    }
+    // Vérifie que le nombre de tentatives valides n’a pas dépassé la limite
+    // et que le nombre total de tentatives est raisonnable
+    expect(attempts).toBeLessThanOrEqual(maxAttempts);
+    expect(totalAttempts).toBeLessThanOrEqual(maxTotalAttempts);
+    
   });
 
 });

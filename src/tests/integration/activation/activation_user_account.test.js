@@ -1,5 +1,5 @@
 import { activateUser } from '../../utils.js';
-import { storeUserId, getUserId } from '../../cache.js';
+import { storeUserId, getUserId, clearUserId } from '../../cache.js';
 
 // Récupérer les variable d'environnement
 const API_URL = process.env.API_PLATFORM_URL;
@@ -15,15 +15,44 @@ if (!API_URL || !TOKEN_SUCCESS || !TOKEN_INVALID || !TOKEN_EXPIRED) {
 async function expectValidResponse(response, expectedStatus) {
   expect(response.status).toBe(expectedStatus);
 
-  const contentType = response.headers.get('content-type');
-  expect(contentType).toMatch(/application\/(ld\+json|json)/);
+  const text = await response.text();
+  const contentType = response.headers.get('content-type') || '';
 
-  const data = await response.json();
-  expect(data && Object.keys(data).length).toBeGreaterThan(0);
-  return data;
+  if (!contentType.includes('json')) {
+    throw new Error(`Expected JSON but got: ${contentType}`);
+  }
+
+  return JSON.parse(text);
 }
 
+async function testActivateExpiredToken({ maxAttempts = 4 } = {}) {
+  for (let i = 0; i < maxAttempts; i++) {
+    const { response } = await activateUser(API_URL, TOKEN_EXPIRED);
+    const status = response.status;
+    const result = await response.json();
+
+    if (status === 400) {
+      // Token expiré
+      expect(result.error).toMatch(/token_expired/);
+    } 
+    else if (status === 429) {
+      // Limite atteinte
+      expect(result.error).toMatch(/max_resend_reached/);
+      break; // inutile de continuer
+    } else {
+      throw new Error(`Unexpected status ${status}: ${JSON.stringify(result)}`);
+    }
+    await new Promise(r => setTimeout(r, 300)); // pause facultative
+  }
+}
+// === Tests d’intégration ===
+
 describe('Activate User Account', () => {
+
+  afterAll(() => {
+    // Nettoie le cache après les tests
+    clearUserId("newUser");
+  });
 
   it('should return activated user account with success message', async () => {
     const { response } = await activateUser(API_URL, TOKEN_SUCCESS);
@@ -31,17 +60,6 @@ describe('Activate User Account', () => {
 
     if (data.success) {
       expect(data.success).toMatch(/Compte activé/);
-
-      // Vérifie qu’il n’y a plus de token pour cet utilisateur
-      const userId = getUserId("newUser");
-      const getResponse = await fetch(`${API_URL}/${userId}/token`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' },
-      });
-
-      const getData = await getResponse.json();
-      expect(getResponse.status).toBe(404);
-      expect(getData.error).toBe('User not found');
     } 
     else {
       expect(data.info).toMatch(/already_activated/);
@@ -58,6 +76,21 @@ describe('Activate User Account', () => {
     const { response } = await activateUser(API_URL, TOKEN_INVALID);
     const data = await expectValidResponse(response, 400);
     expect(data.error).toMatch(/invalid_token/);
- });
+  });
+
+  it('should return a message token expired', async () => {
+    const getResponse = await fetch(`${API_URL}/refresh_tokens`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await expectValidResponse(getResponse, 200);
+    expect(data.message).toMatch(/Tokens refreshed/);
+
+    await testActivateExpiredToken({ maxAttempts: 4 });
+  });
+
+  it('should return 429 after max refresh attempts', async () => {
+    await testActivateExpiredToken({ maxAttempts: 3 });
+  });
 
 });

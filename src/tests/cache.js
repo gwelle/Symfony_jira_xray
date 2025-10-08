@@ -5,7 +5,9 @@ export function storeUserId(key, id) {
 }
 
 export function getUserId(key) {
-  return userCache.get(key);
+  const id = userCache.get(key);
+  if (!id) throw new Error(`No userId stored for key "${key}"`);
+  return id;
 }
 
 export function clearUserId(key) {

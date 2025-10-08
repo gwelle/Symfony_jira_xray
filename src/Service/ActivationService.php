@@ -187,12 +187,12 @@ class ActivationService
         $connection = $this->entityManager->getConnection();
 
         $sql = "
-            SELECT id
-            FROM activation_token
+            SELECT at.id
+            FROM activation_token as at
             WHERE expired_at IS NULL
-            AND created_at < NOW() - INTERVAL '24 hours'
+            AND created_at < NOW() - INTERVAL '1 hour'
             ORDER BY created_at DESC
-            LIMIT 50
+            LIMIT 50;
         ";
 
         $ids = $connection->executeQuery($sql)->fetchFirstColumn(); // récupère juste la colonne `id`
@@ -212,8 +212,7 @@ class ActivationService
 
                 // Générer un nouveau token dans le même enregistrement
                 $this->regenerateToken(oldActivationToken: $token);
-
-               $updatedIds[] = $token->getId();
+                $updatedIds[] = $token->getId();
             }
         }
         $this->entityManager->flush();

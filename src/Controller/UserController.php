@@ -7,7 +7,6 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use App\Entity\User;
 use App\Service\ActivationService;
-use App\Service\MailerService;
 use App\Message\SendConfirmationEmail;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,14 +22,12 @@ final class UserController extends AbstractController
     /**
      * Summary of __construct
      * @param \App\Service\ActivationService $activationService
-     * @param \App\Service\MailerService $mailerService
-     * @param \Doctrine\ORM\EntityManagerInterface $em
+     * @param \Doctrine\ORM\EntityManagerInterface $entityManager
      * @param \Symfony\Component\Messenger\MessageBusInterface $bus
      */
     public function __construct(
         private ActivationService $activationService,
-        private MailerService $mailerService,
-        private EntityManagerInterface $em,
+        private EntityManagerInterface $entityManager,
         private MessageBusInterface $bus
     ) {}
 
@@ -38,7 +35,7 @@ final class UserController extends AbstractController
      * Redirects to the API endpoint.
      */
     #[Route('/', name: 'redirect_to_api')]
-    public function redirectToApi()
+    public function redirectToApi(): RedirectResponse
     {
         return $this->redirect('/api');
     }
@@ -52,33 +49,43 @@ final class UserController extends AbstractController
     #[Route('/api/users/activate_account/{token}', name: 'user_activate', methods: ['GET'])]
     public function activate(string $token): Response
     {
-    $results = $this->activationService->activateAccount($token);
+        $results = $this->activationService->activateAccount($token);
 
-    switch ($results['status']) {
-        case 'success':
-            return $this->json(['success' => 'Compte activé'], 200);
-        case 'already_activated':
-            return $this->json(['info' => 'already_activated'], 200);
-        case 'expired':
-            $tokenExpired = $results['token']; // objet ActivationToken
-            $user = $tokenExpired->getAccount();
+        try {
+            switch ($results['status']) {
+                case 'success':
+                    return $this->json(['success' => 'Compte activé'], 200);
+                case 'already_activated':
+                    return $this->json(['info' => 'already_activated'], 200);
+                case 'expired':
+                    $tokenExpired = $results['token']; // objet ActivationToken
+                    $user = $tokenExpired->getAccount();
 
-            // Génération nouveau token
-            $newToken = $this->activationService->generateToken($user);
+                    // Génération nouveau token
+                    $newToken = $this->activationService->generateToken($user);
 
-            // Envoi email de confirmation
-            $this->bus->dispatch(new SendConfirmationEmail(
-                $user->getEmail(),
-                $newToken,
-                $user->getFirstName().' '.$user->getLastName(),
-                true
-            ));
-            return $this->json(['error' => 'token_expired'], 400);
-        case 'blocked':
-            return $this->json(['error' => 'max_resend_reached'], 429);
-        case 'invalid':
-        default:
-            return $this->json(['error' => 'invalid_token'], 400);
+                    // Envoi email de confirmation
+                    $this->bus->dispatch(new SendConfirmationEmail(
+                        $user->getEmail(),
+                        $newToken,
+                        $user->getFirstName().' '.$user->getLastName(),
+                        true
+                    ));
+                    return $this->json(['error' => 'token_expired'], 400);
+                case 'blocked':
+                    return $this->json(['error' => 'max_resend_reached'], 429);
+                case 'invalid':
+                default:
+                    return $this->json(['error' => 'invalid_token'], 400);
+                }
+            }
+            
+        catch (\Throwable $e) {
+            // Retourne toujours un JSON pour Jest
+            return $this->json([
+                'error' => 'internal_error',
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 
@@ -99,7 +106,7 @@ final class UserController extends AbstractController
 
         // Vérifier que l’email est fourni et valide 
         // et que l’utilisateur existe et n’est pas encore activé
-        $user = $this->em->getRepository(User::class)->findOneBy([
+        $user = $this->entityManager->getRepository(User::class)->findOneBy([
             'email' => $email,
             'isActivated' => false
         ]);
@@ -151,22 +158,31 @@ final class UserController extends AbstractController
 
         return new JsonResponse([
             'status' => 'success',
-            'message' => 'Tokens refreshed'
+            'message' => 'Tokens refreshed',
+            'results' => $results
         ], 200);
     }
 
     /**
      * Retrieves the activation token for a specific user.
-     * @param User $user
+     * @param int $id The ID of the user.
      * @return JsonResponse
      */
     #[Route('/api/users/{id}/token', methods: ['GET'])]
-    public function getTokenForUser(User $user): JsonResponse
+    public function getTokenForUser(int $id): JsonResponse
     {
-        $token = $this->activationService->getValidTokenForUser($user);
-        if( !$token ) {
+        $user = $this->entityManager->getRepository(User::class)->find($id);
+
+        if (!$user) {
             return $this->json(['error' => 'User not found'], 404);
         }
+
+        $token = $this->activationService->getValidTokenForUser($user);
+
+        if (!$token) {
+            return $this->json(['error' => 'No valid token found'], 404);
+        }
+
         return $this->json(['token' => $token], 200);
     }
 
@@ -175,10 +191,10 @@ final class UserController extends AbstractController
      * @param array $params Optional query parameters to append to the URL.
      * @return RedirectResponse A redirect response to the frontend login page.
      */
-    private function redirectToFrontend(array $params = []): RedirectResponse
+    /*private function redirectToFrontend(array $params = []): RedirectResponse
     {
         $frontendLoginUrl = $_ENV['URL_LOGIN_FRONT'].'/login';
         // Append any additional query parameters encoded and securely
         return $this->redirect($frontendLoginUrl . '?' . http_build_query($params));
-    }
+    }*/
 }

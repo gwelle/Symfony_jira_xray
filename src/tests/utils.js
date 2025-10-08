@@ -1,5 +1,3 @@
-import fetch from 'node-fetch';
-
 // Génère une chaîne de caractères aléatoire
 export function randomString(length = 8, charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ') {
   let str = '';
@@ -40,20 +38,39 @@ export function randomPassword(minLength = 8, maxLength = 15) {
 
   let pwd = '';
   do {
-    const len = Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength;
+    const length = Math.floor(Math.random() * (15 - 8 + 1)) + 8; // longueur entre 8 et 15
     pwd = '';
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < length; i++) {
       pwd += all.charAt(Math.floor(Math.random() * all.length));
     }
-  } while (!regex.test(pwd));
+  } 
+  while (!regex.test(pwd));
 
   return pwd;
 }
 
 // Génère un couple mot de passe + confirmation
 export function randomPasswordPair(length = 8) {
+
   const pwd = randomPassword(length);
-  return { plainPassword: pwd, confirmationPassword: pwd };
+
+  // Vérification immédiate et stricte
+  if (!pwd || typeof pwd !== 'string') {
+    fail('[ERREUR] Mot de passe invalide généré');
+  }
+
+  const pair = {
+    plainPassword: pwd.trim(),
+    confirmationPassword: pwd.trim(), // on s’assure qu’ils sont *strictement* identiques
+  };
+
+  // Double vérification
+  if (pair.plainPassword !== pair.confirmationPassword) {
+    console.error('[ERREUR CRITIQUE] Les mots de passe générés ne correspondent pas :', pair);
+    fail('Les mots de passe ne correspondent pas — test interrompu');
+  }
+
+  return pair;
 }
 
 /**
@@ -78,7 +95,7 @@ export async function createUser(apiUrl, overrides = {}) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/ld+json',
-      'Accept': 'application/ld+json'
+      'Accept': 'application/ld+json, application/json, */*;q=0.8'
     },
     body: JSON.stringify(payload)
   });

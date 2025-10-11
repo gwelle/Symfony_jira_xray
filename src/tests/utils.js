@@ -39,7 +39,7 @@ export function randomLastName(length = 8) {
  */
 export function randomEmail(domain = 'gmail.com') {
   const local = randomString(6).toLowerCase();
-  const uniq = Math.random().toString(36).substring(2, 8); // suffixe unique
+  const uniq = Math.random().toString(36).substring(2, 10); // suffixe unique
   return `${local}.${uniq}@${domain}`;
 }
 

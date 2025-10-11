@@ -4,13 +4,14 @@ namespace App\Entity;
 
 use App\Repository\UserRepository;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Get;
-use App\State\UserStateProcessor;
+use App\State\UserEmailProcessor;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
@@ -20,7 +21,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
     operations: [
         new Post(
             denormalizationContext: ['groups' => [self::GROUP_WRITE]],
-            processor: UserStateProcessor::class,
+            processor: UserEmailProcessor::class,
         ),
         new Get(normalizationContext: ['groups' => [self::GROUP_READ]])
         
@@ -127,9 +128,23 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     /**
      * @var Collection<int, ActivationToken>
      */
-    #[ORM\OneToMany(targetEntity: ActivationToken::class, mappedBy: 'account')]
+    #[ORM\OneToMany(
+        targetEntity: ActivationToken::class,
+        mappedBy: 'account',
+        cascade: ['persist', 'remove'],   //  Permet de persister automatiquement les tokens
+        orphanRemoval: true               //  Nettoie les tokens supprimés
+)]
     #[Groups([self::GROUP_READ])]
     private Collection $activationTokens;
+
+    /**
+     * Constructor for User entity.
+     * Initializes the activationTokens collection.
+     */
+    public function __construct()
+    {
+        $this->activationTokens = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {

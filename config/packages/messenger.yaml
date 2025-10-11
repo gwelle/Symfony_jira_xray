@@ -2,9 +2,16 @@ framework:
     messenger:
         default_bus: messenger.bus.default
         transports:
-            async: # nom du transport
+            async: 
                 dsn: '%env(MESSENGER_TRANSPORT_DSN)%' # utilise ta base de données
                 options:
-                    table_name: messenger_messages
+                    table_name: messenger_messages # php bin/console messenger:setup-transports
+                    use_notify: true
+                    check_delayed_interval: 60000 #permet d’optimiser les envois groupés pour la performance.
         routing:
             'App\Message\SendConfirmationEmail': async
+        buses:
+            messenger.bus.default:
+                middleware:
+                    - doctrine_transaction
+                    - dispatch_after_current_bus

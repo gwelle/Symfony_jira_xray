@@ -29,7 +29,8 @@ class ActivationService
      * Generates a new activation token for the given user.
      *
      * @param User $user The user for whom the activation token is to be generated.
-     * @return string The generated activation token.
+     * @return string The generated plain activation token.
+     * @throws \Exception If there is an error during token generation.
      */
     public function generateToken(User $user): string
     {
@@ -38,16 +39,15 @@ class ActivationService
 
         $activationToken = new ActivationToken();
         $activationToken->setAccount($user);
+        // store the plain token in the entity for email sending into UserEmailProcessor
+        $activationToken->setPlainToken($plainToken);
         $activationToken->setHashedToken(hash('sha256', $plainToken));
         $activationToken->setCreatedAt(new \DateTimeImmutable());
         $activationToken->setExpiredAt(null);
+        $user->addActivationToken($activationToken);
 
-        // Persist the token entity
-        $this->entityManager->persist($activationToken);
-        $this->entityManager->flush();
-
-        // Return the plain token to be sent via email
-        return $plainToken;
+        // Return the plain token to be sent via email 
+        return $plainToken; 
     }
 
     /**

@@ -13,9 +13,11 @@ class ActivationToken
     #[ORM\Column]
     private ?int $id = null;
 
+    #[ORM\Column(length: 64, nullable: true)]
     private ?string $plainToken = null;
 
-    #[ORM\ManyToOne(inversedBy: 'activationTokens')]
+    #[ORM\ManyToOne(targetEntity: User::class, inversedBy: 'activationTokens')]
+    #[ORM\JoinColumn(nullable: false)]
     private ?User $account = null;
 
     #[ORM\Column]

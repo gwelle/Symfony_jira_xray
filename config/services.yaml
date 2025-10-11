@@ -26,15 +26,22 @@ services:
     # please note that last definitions always *replace* previous ones
     
     ## Processor pour User (hash password + création user)
-    App\State\UserStateProcessor:
+    App\State\UserCreationProcessor:
         arguments:
             $processor: '@api_platform.doctrine.orm.state.persist_processor'
             $passwordHasher: '@security.user_password_hasher'
             $activationService: '@App\Service\ActivationService'
-            
-
+            $logger: '@logger'
         tags:
             - { name: 'api_platform.state_processor', priority: 20 }
+
+    App\State\UserEmailProcessor:
+        arguments:
+            $processor: '@App\State\UserCreationProcessor'
+            $bus: '@messenger.default_bus'
+            $logger: '@logger'
+        tags:
+            - { name: 'api_platform.state_processor', priority: 10 }
     
     App\Service\MailerService:
         arguments:

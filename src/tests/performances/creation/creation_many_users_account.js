@@ -5,26 +5,25 @@ import { randomFirstName, randomLastName, randomEmail, randomPasswordPair } from
 // Configuration test options
 export const options = {
     scenarios: { 
-        creation_account: { 
+        stress_batch_heavy: { 
           executor: 'ramping-vus',
           stages: [
-            { duration: '20s', target: 10 },   // montée douce
-                { duration: '30s', target: 30 },   // montée progressive
-                { duration: '30s', target: 50 },   // plateau stable
-                { duration: '30s', target: 70 },   // nouvelle montée
-                { duration: '30s', target: 90 },   // plateau
-                { duration: '30s', target: 100 },  // atteindre 100 VUs
-                { duration: '20s', target: 0 }     // ramp down
-            ],
-          gracefulRampDown: '5s'
-        }
-    },
-    thresholds: {
-        http_req_duration: [
-            'avg<5000',      // moyenne < 5s, réaliste pour ton backend
-            'p(95)<7000',    // p95 < 7s
-        ],
-        checks: ['rate>0.70'], // 70% des checks doivent réussir
+            { duration: '1m', target: 100 },  // échauffement
+            { duration: '2m', target: 200 },  // montée progressive
+            { duration: '3m', target: 400 },  // charge stable
+            { duration: '3m', target: 600 },  // pic de charge
+            { duration: '2m', target: 300 },  // redescente
+            { duration: '1m', target: 0 },    // retour au calme
+          ],
+        gracefulRampDown: '10s',
+
+      },
+      
+  },
+    
+  thresholds: {
+      http_req_duration: ['avg<1000', 'p(95)<2000'],
+      checks: ['rate>0.95'],
     }
 };
 
@@ -60,7 +59,7 @@ export default function createManyUsersTest() {
 
   try {
     // Send the POST request to create a user account
-    const res = http.post(`${API_URL}`, payload, params,  { tags: { endpoint: 'register' } });
+    const res = http.post(`${API_URL}`, payload, params, { tags: { endpoint: 'register' }, timeout: '120s' });
 
     // Check the response status and time
     check(res, {
@@ -70,15 +69,10 @@ export default function createManyUsersTest() {
 
     // Log error details
     if (res.status !== 201) {
-  console.error(`
-  ❌ ERREUR API
-  Status: ${res.status}
-  URL: ${API_URL}/users
-  Durée: ${res.timings.duration}ms
-  Réponse: ${res.body?.substring(0, 500)}
-  `);
-  }
-} catch (error) {
-  fail(`Request failed: ${error.message}`);
+      fail(`❌ Error: status=${res.status}, body=${res.body}`);
+    }
+  } 
+  catch (error) {
+    fail(`Request failed: ${error.message}`);
   }
 }

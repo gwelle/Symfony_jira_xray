@@ -35,7 +35,7 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
 #[ORM\Table(name: '`account`')]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
 #[ORM\HasLifecycleCallbacks]
-#[Assert\Callback('validatePasswordsMatch')]
+#[Assert\Callback('validatePasswordsMatch', groups: ['passwords_check'])]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
 
@@ -113,7 +113,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     )]
     #[Assert\Regex(
         pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,15}$/',
-        message: 'Le mot de passe doit contenir au moins une lettre majuscule, une minuscule, un chiffre et un caractère spécial.'
+        message: 'Le mot de passe doit contenir entre 8 et 15 caractères, avec au moins une majuscule, une minuscule, un chiffre et un caractère spécial.'
     )]
     #[Groups([self::GROUP_WRITE])]
     private ?string $plainPassword = null;
@@ -298,12 +298,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     /**
      * @return Collection<int, ActivationToken>
+     * @psalm-return Collection<int, ActivationToken>
      */
     public function getActivationTokens(): Collection
     {
         return $this->activationTokens;
     }
 
+    /**
+     * @param \App\Entity\ActivationToken $activationToken
+     * @return User|null
+     */
     public function addActivationToken(ActivationToken $activationToken): static
     {
         if (!$this->activationTokens->contains($activationToken)) {
@@ -314,6 +319,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    /**
+     * @param \App\Entity\ActivationToken $activationToken
+     * @return User|null
+     */
     public function removeActivationToken(ActivationToken $activationToken): static
     {
         if ($this->activationTokens->removeElement($activationToken) && $activationToken->getAccount() === $this) {

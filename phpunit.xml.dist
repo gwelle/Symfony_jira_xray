@@ -1,0 +1,7 @@
+<phpunit>
+    <php>
+        <env name="APP_ENV" value="test"/>
+        <env name="PASSWORD" value="Test123**"/>
+        <env name="PASSWORD_INVALID" value="InvalidPassword123**"/>
+    </php>
+</phpunit>

@@ -123,7 +123,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\Column(type: 'boolean', nullable: false, options: ['default' => false])]
-    private ?bool $isActivated = null;
+    private ?bool $isActivated = false;
 
     /**
      * @var Collection<int, ActivationToken>

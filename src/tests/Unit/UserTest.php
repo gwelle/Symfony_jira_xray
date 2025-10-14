@@ -8,12 +8,15 @@ use \Faker\Generator;
 use Symfony\Component\Validator\Validation;
 use App\Entity\User;
 use \PHPUnit\Framework\Attributes\DataProvider;
+use Symfony\Component\Validator\ConstraintViolationListInterface;
+use Doctrine\Common\Collections\Collection;
 
 class UserTest extends TestCase
 {
     private ?Generator $faker;
     private ?User $user;
     private ?object $validator;
+    private ?object $violations;
     private ?string $password;
     private ?string $fakePassword;
 
@@ -38,32 +41,6 @@ class UserTest extends TestCase
         $this->fakePassword = null;
     }
 
-    #[DataProvider('providePropertyCases')]
-    public function test_validator_property(string $property, bool $valid): void
-    {
-        $confirmationPassword = $this->password;
-        $fakeConfirmationPassword = $this->fakePassword;
-
-        $value = match ($property) {
-            'email' => $valid ? $this->faker->safeEmail() : $this->faker->email() . $this->faker->randomNumber(),
-            'firstName' => $valid ? $this->faker->firstName() : $this->faker->firstName() . $this->faker->randomNumber(),
-            'lastName' => $valid ? $this->faker->lastName() : $this->faker->lastName() . $this->faker->randomNumber(),
-            'plainPassword' => $valid ? $this->password : $this->fakePassword,
-            'confirmationPassword' => $valid ? $confirmationPassword : $fakeConfirmationPassword,
-            default => throw new \InvalidArgumentException("Unknown property $property")
-        };
-
-        $setter = 'set' . ucfirst($property);
-        $this->user->$setter($value);
-
-        $violations = $this->validator->validateProperty($this->user, $property);
-        if ($valid) {
-            $this->assertCount(0, $violations, "Expected no violations for $property with value $value");
-        } else {
-            $this->assertGreaterThan(0, $violations->count(), "Expected at least one violation for $property with value $value");
-        }
-    }
-
     /**
      * Summary of providePropertyCases
      * @return array<bool|string>[]
@@ -84,20 +61,111 @@ class UserTest extends TestCase
         ];
     }
 
+    /**
+     * Summary of validateUserPasswords
+     * @return \Symfony\Component\Validator\ConstraintViolationListInterface
+     */
+    private function validateUserPasswords(): ConstraintViolationListInterface
+    {
+        return $this->validator->validate($this->user, null, groups: ['passwords_check']);
+    }
+
+    /**
+     * Summary of assertPropertyViolations
+     * @param mixed $violations
+     * @param bool $isValid
+     * @param string $propertyName
+     * @return void
+     */
+    private function assertPropertyViolations($violations, bool $isValid, string $propertyName): void
+    {
+        if ($isValid) {
+            $this->assertCount(0, $violations, "Expected no violations for {$propertyName}");
+        } 
+        else {
+            $this->assertGreaterThan(0, count($violations), "Expected at least one violation for {$propertyName}");
+        }
+    } 
+
+    /**
+     * Summary of assertPasswordsScenario
+     * @param string $plain
+     * @param string $confirmation
+     * @param bool $isValid
+     * @return void
+     */
+    private function assertPasswordsScenario(string $plain, string $confirmation, bool $isValid): void
+    {
+        $this->user->setPlainPassword($plain);
+        $this->user->setConfirmationPassword($confirmation);
+        $violations = $this->validateUserPasswords();
+        $this->assertPropertyViolations($violations, $isValid, 'plainPassword / confirmationPassword');
+    }
+
+    /**
+     * Summary of test_validator_property
+     * @param string $property
+     * @param bool $valid
+     * @return void
+     */
+    #[DataProvider('providePropertyCases')]
+    public function test_validator_property(string $property, bool $valid): void
+    {
+        $confirmationPassword = $this->password;
+        $fakeConfirmationPassword = $this->fakePassword;
+
+        $value = match ($property) {
+            'email' => $valid ? $this->faker->safeEmail() : $this->faker->email() . $this->faker->randomNumber(),
+            'firstName' => $valid ? $this->faker->firstName() : $this->faker->firstName() . $this->faker->randomNumber(),
+            'lastName' => $valid ? $this->faker->lastName() : $this->faker->lastName() . $this->faker->randomNumber(),
+            'plainPassword' => $valid ? $this->password : $this->fakePassword,
+            'confirmationPassword' => $valid ? $confirmationPassword : $fakeConfirmationPassword,
+            default => throw new \InvalidArgumentException("Unknown property $property")
+        };
+
+        $setter = 'set' . ucfirst($property);
+        $this->user->$setter($value);
+
+        $this->assertContains('ROLE_USER', $this->user->getRoles(), 'User should have ROLE_USER by default');
+        $this->assertFalse($this->user->isActivated(), 'User should not be activated by default');
+
+        $this->violations = $this->validator->validateProperty($this->user, $property);
+        $this->assertPropertyViolations($this->violations, $valid, $property);
+    }
+
+    /**
+     * Summary of test_passwords_match_callback
+     * @return void
+     */
     public function test_passwords_match_callback(): void
     {
+        // ✅ Cas valide : mots de passe identiques
+        $this->assertPasswordsScenario($this->password, $this->password, true);
 
-        // ✅ Mot de passe "valide"
-        $this->user->setPlainPassword($this->password);
-        $this->user->setConfirmationPassword($this->password);
+        // ❌ Cas invalide : mots de passe différents
+        $this->assertPasswordsScenario($this->password, $this->fakePassword, false);
+    }
 
-        $violations = $this->validator->validate($this->user, null, groups: ['passwords_check']);
-        $this->assertCount(0, $violations, 'Expected no violations when passwords match');
+    /**
+     * Summary of test_lifecycle_callback_on_user
+     * @return void
+     */
+    public function test_lifecycle_callback_on_user(): void
+    {
+        // ✅ La création automatique de createdAt via onPrePersist().
+        $this->assertNull($this->user->getCreatedAt());
+        $this->user->onPrePersist();
+        $this->assertInstanceOf(\DateTimeImmutable::class, $this->user->getCreatedAt());
+        $this->assertNotNull($this->user->getCreatedAt());
+    }
 
-        // ❌ Mot de passe "invalide"
-        $this->user->setConfirmationPassword($this->fakePassword);
-
-        $violations = $this->validator->validate($this->user, null, groups: ['passwords_check']);
-        $this->assertGreaterThan(0, $violations->count(), 'Expected at least one violation when passwords do not match');
+    /**
+     * Summary of test_user_property_activation_token
+     * @return void
+     */
+    public function test_user_property_activation_token(): void
+    {
+        $this->assertInstanceOf(Collection::class, $this->user->getActivationTokens());
+        $this->assertCount(0, $this->user->getActivationTokens());
     }
 }

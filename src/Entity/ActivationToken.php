@@ -51,9 +51,13 @@ class ActivationToken
         return $this->account;
     }
 
-    public function setAccount(?User $account): static
+    public function setAccount(?User $account): self
     {
         $this->account = $account;
+
+        if ($account !== null && !$account->getActivationTokens()->contains($this)) {
+            $account->addActivationToken($this);
+        }
 
         return $this;
     }
@@ -84,7 +88,9 @@ class ActivationToken
 
     public function isExpired(): bool
     {
-            return $this->expiredAt !== null && $this->expiredAt < new \DateTimeImmutable();
+            $expirationDelay = new \DateInterval('PT24H'); // 24 hours
+            return $this->createdAt !== null 
+                && $this->createdAt->add($expirationDelay) < new \DateTimeImmutable();
     }
 
     public function isValid(): bool

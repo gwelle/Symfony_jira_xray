@@ -88,9 +88,7 @@ class ActivationToken
 
     public function isExpired(): bool
     {
-            $expirationDelay = new \DateInterval('PT24H'); // 24 hours
-            return $this->createdAt !== null 
-                && $this->createdAt->add($expirationDelay) < new \DateTimeImmutable();
+        return $this->expiredAt !== null && $this->expiredAt < new \DateTimeImmutable();
     }
 
     public function isValid(): bool
@@ -109,5 +107,23 @@ class ActivationToken
         $this->hashedToken = $hashedToken;
 
         return $this;
+    }
+
+    /** 
+     * Regenerate the activation token for the user concerning to unit tests.
+     * @return void
+     */
+    public function regenerateToken(): void
+    {
+        // Générer un nouveau token brut et son hash
+        $plainToken = bin2hex(random_bytes(32));
+        $hashedToken = hash('sha256', $plainToken);
+
+        // Mettre à jour les propriétés
+        $this->plainToken = $plainToken;
+        $this->hashedToken = $hashedToken;
+
+        $this->createdAt = new \DateTimeImmutable();
+        $this->expiredAt = $this->createdAt->modify('+24 hours');
     }
 }

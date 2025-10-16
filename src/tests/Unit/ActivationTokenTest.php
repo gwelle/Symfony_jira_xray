@@ -15,6 +15,7 @@ class ActivationTokenTest extends TestCase
     private static ?ActivationToken $activationToken = null;
 
     /**
+     * Summary of setUp
      * @return void
      */
     public function setUp(): void
@@ -26,6 +27,10 @@ class ActivationTokenTest extends TestCase
         $this->createUser();
     }
 
+    /**
+     * Summary of tearDownAfterClass
+     * @return void
+     */
     public static function tearDownAfterClass(): void
     {
         parent::tearDownAfterClass();
@@ -34,6 +39,10 @@ class ActivationTokenTest extends TestCase
         self::$activationToken = null;
     }
 
+    /**
+     * Summary of createUser
+     * @return void
+     */
     public function createUser(): void
     {
         $password = $_ENV['PASSWORD'];
@@ -46,6 +55,7 @@ class ActivationTokenTest extends TestCase
     }
 
     /**
+     * Summary of test_initial_state
      * @return void
      */
     public function test_initial_state(): void
@@ -57,6 +67,7 @@ class ActivationTokenTest extends TestCase
     }
 
     /**
+     * Summary of test_creation_token
      * @return void
      */
     public function test_creation_token(): void
@@ -73,6 +84,10 @@ class ActivationTokenTest extends TestCase
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', self::$activationToken->getHashedToken());
     }
 
+    /**
+     * Summary of test_set_createdAt
+     * @return void
+     */
     public function test_set_createdAt(): void
     {
         $now = new \DateTimeImmutable();
@@ -81,22 +96,75 @@ class ActivationTokenTest extends TestCase
         $this->assertSame($now, self::$activationToken->getCreatedAt());
     }
 
-    public function test_token_validity_and_expiration(): void
+    /**
+     * Summary of test_token_expiration_in_different_cases
+     * @return void
+     */
+    public function test_token_expiration_in_different_cases(): void
     {
         // Test de la validité initiale
         $this->assertFalse(self::$activationToken->isExpired());
-        $this->assertTrue(self::$activationToken->isValid());
-
+        
         // Simuler la création du token il y a 25 heures
         $past = new \DateTimeImmutable('-25 hours');
-        self::$activationToken->setCreatedAt($past);
+        self::$activationToken->setExpiredAt($past);
 
         // Le token devrait maintenant être expiré
+        $this->assertTrue(self::$activationToken->isExpired());
+
+        $past = new \DateTimeImmutable('+1 hour');
+        self::$activationToken->setExpiredAt($past);
+
+        // Le token devrait toujours être valide
+        $this->assertFalse(self::$activationToken->isExpired());
+        $this->assertTrue(self::$activationToken->isValid());
+
+    }
+
+    /**
+     * Summary of test_token_validity_consistency
+     * @return void
+     */
+    public function test_token_validity_consistency(): void
+    {
+        $expired = new \DateTimeImmutable('-26 hours');
+        self::$activationToken->setExpiredAt($expired);
+
         $this->assertTrue(self::$activationToken->isExpired());
         $this->assertFalse(self::$activationToken->isValid());
     }
 
-    //Relation bidirectionnelle avec User
+    /**
+     * Summary of test_token_regeneration_resets_values
+     * @return void
+     */
+    public function test_token_regeneration_resets_values(): void
+    {
+        $oldPlain = self::$activationToken->getPlainToken();
+        $oldHashed = self::$activationToken->getHashedToken();
+        $oldCreated = self::$activationToken->getCreatedAt();
+
+        // Simuler une expiration
+        self::$activationToken->setExpiredAt(new \DateTimeImmutable('-2 days'));
+        $this->assertTrue(self::$activationToken->isExpired());
+
+        // Régénérer le token
+        self::$activationToken->regenerateToken();
+
+        // Assertions : les valeurs doivent avoir changé
+        $this->assertNotEquals($oldPlain, self::$activationToken->getPlainToken());
+        $this->assertNotEquals($oldHashed, self::$activationToken->getHashedToken());
+        $this->assertNotEquals($oldCreated, self::$activationToken->getCreatedAt());
+
+        // Et le nouveau token ne doit pas être expiré
+        $this->assertFalse(self::$activationToken->isExpired());
+        $this->assertTrue(self::$activationToken->isValid());
+    }
+
+    /**
+     * Summary of test_bidirectional_relationship_with_user
+     * @return void
+     */
     public function test_bidirectional_relationship_with_user(): void
     {
         self::$activationToken->setAccount(self::$user);

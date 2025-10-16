@@ -29,6 +29,9 @@ class ActivationToken
     #[ORM\Column(length: 64)]
     private ?string $hashedToken = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $previousHashedToken = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -115,6 +118,12 @@ class ActivationToken
      */
     public function regenerateToken(): void
     {
+        // Conserver l'ancien hashé dans previousHashedToken
+        $this->previousHashedToken = $this->hashedToken;
+
+        // Expirer le token courant
+        $this->expiredAt = new \DateTimeImmutable();
+
         // Générer un nouveau token brut et son hash
         $plainToken = bin2hex(random_bytes(32));
         $hashedToken = hash('sha256', $plainToken);
@@ -124,6 +133,18 @@ class ActivationToken
         $this->hashedToken = $hashedToken;
 
         $this->createdAt = new \DateTimeImmutable();
-        $this->expiredAt = $this->createdAt->modify('+24 hours');
+        $this->expiredAt = null;
+    }
+
+    public function getPreviousHashedToken(): ?string
+    {
+        return $this->previousHashedToken;
+    }
+
+    public function setPreviousHashedToken(?string $previousHashedToken): static
+    {
+        $this->previousHashedToken = $previousHashedToken;
+
+        return $this;
     }
 }

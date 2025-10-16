@@ -162,6 +162,20 @@ class ActivationTokenTest extends TestCase
     }
 
     /**
+     * Summary of test_token_regeneration_preserves_previous_hash
+     * @return void
+     */
+    public function test_token_regeneration_preserves_previous_hash(): void
+    {
+        $oldHashed = self::$activationToken->getHashedToken();
+        self::$activationToken->regenerateToken();
+
+        $this->assertNotEquals($oldHashed, self::$activationToken->getHashedToken());
+        $this->assertEquals($oldHashed, self::$activationToken->getPreviousHashedToken());
+        $this->assertTrue(self::$activationToken->isValid());
+    }
+
+    /**
      * Summary of test_bidirectional_relationship_with_user
      * @return void
      */

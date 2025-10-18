@@ -34,20 +34,25 @@ class ActivationService
      */
     public function generateToken(User $user): string
     {
-        // Generate a new plain token
-        $plainToken = bin2hex(random_bytes(32));
+        try{
+            // Generate a new plain token
+            $plainToken = bin2hex(random_bytes(32));
 
-        $activationToken = new ActivationToken();
-        $activationToken->setAccount($user);
-        // store the plain token in the entity for email sending into UserEmailProcessor
-        $activationToken->setPlainToken($plainToken);
-        $activationToken->setHashedToken(hash('sha256', $plainToken));
-        $activationToken->setCreatedAt(new \DateTimeImmutable());
-        $activationToken->setExpiredAt(null);
-        $user->addActivationToken($activationToken);
+            $activationToken = new ActivationToken();
+            $activationToken->setAccount($user);
+            // store the plain token in the entity for email sending into UserEmailProcessor
+            $activationToken->setPlainToken($plainToken);
+            $activationToken->setHashedToken(hash('sha256', $plainToken));
+            $activationToken->setCreatedAt(new \DateTimeImmutable());
+            $activationToken->setExpiredAt(null);
+            $user->addActivationToken($activationToken);
 
-        // Return the plain token to be sent via email 
-        return $plainToken; 
+            // Return the plain token to be sent via email 
+            return $plainToken; 
+        } 
+        catch (\Exception $e) {
+            throw new \Exception('Error generating token: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -55,25 +60,30 @@ class ActivationService
      * Marque toujours l’ancien token comme expiré avant de créer le nouveau.
      * @param ActivationToken $activationToken
      * @return string Le nouveau token en clair (à envoyer si besoin)
-     * @throws \Exception
+     * @throws \Exception En cas d’erreur lors de la régénération du token.
      */
     public function regenerateToken(ActivationToken $oldActivationToken): string
     {
-        $oldActivationToken->setExpiredAt(new \DateTimeImmutable());
+        try{
+            $oldActivationToken->setExpiredAt(new \DateTimeImmutable());
 
-        $newPlainToken = bin2hex(random_bytes(32));
-        $newHashedToken = hash('sha256', data: $newPlainToken);
+            $newPlainToken = bin2hex(random_bytes(32));
+            $newHashedToken = hash('sha256', data: $newPlainToken);
 
-        $newToken = new ActivationToken();
-        $newToken->setAccount($oldActivationToken->getAccount());
-        $newToken->setHashedToken($newHashedToken);
-        $newToken->setCreatedAt(new \DateTimeImmutable());
-        $newToken->setExpiredAt(null);
+            $newToken = new ActivationToken();
+            $newToken->setAccount($oldActivationToken->getAccount());
+            $newToken->setHashedToken($newHashedToken);
+            $newToken->setCreatedAt(new \DateTimeImmutable());
+            $newToken->setExpiredAt(null);
 
-        $this->entityManager->persist($newToken);
-        $this->entityManager->flush();
+            $this->entityManager->persist($newToken);
+            $this->entityManager->flush();
 
-        return $newPlainToken;
+            return $newPlainToken;
+        } 
+        catch (\Exception $e) {
+            throw new \Exception('Error regenerating token: ' . $e->getMessage());
+        }
     }
 
     /**

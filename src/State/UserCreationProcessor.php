@@ -36,34 +36,38 @@ class UserCreationProcessor implements ProcessorInterface
      */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
+        // Check if the data is an instance of User and has a plain password
+        if (!$data instanceof User) {
+            $this->logger->error('Processor reçu une donnée non conforme');
+            return null;
+        }
+
+        if (!$data->getPlainPassword()) {
+            $this->logger->error('Mot de passe manquant, utilisateur non créé.');
+            return null;
+        }
+
         try {
-            // Check if the data is an instance of User and has a plain password
-            if ($data instanceof User && $data->getPlainPassword()) {
 
-                $hashedPassword = $this->passwordHasher->hashPassword(
-                    $data,
-                    $data->getPlainPassword()
-                );
+            $hashedPassword = $this->passwordHasher->hashPassword(
+                $data, 
+                $data->getPlainPassword()
+            );
+            $data->setPassword($hashedPassword);
+            $data->setPlainPassword(''); // Clear the plain password after hashing
+            $data->setConfirmationPassword(''); // Clear the confirmation password
 
-                $data->setPassword($hashedPassword);
-                $data->setPlainPassword(''); // Clear the plain password after hashing
-                $data->setConfirmationPassword(''); // Clear the confirmation password
-                $data->setIsActivated(false); // Set default activation status
+            $this->activationService->generateToken($data);
 
-                $this->activationService->generateToken($data);
-                
-                //return $this->processor->process($data, $operation, $uriVariables, $context);
-            }
-
-        // If not a User instance or no plain password, delegate to the next processor
-        return $this->processor->process($data, $operation, $uriVariables, $context);
-        }  
-        
+            $this->logger->info('User created successfully');
+            return $this->processor->process($data, $operation, $uriVariables, $context);
+        } 
         catch (\Throwable $e) {
-        $this->logger->error('Erreur lors du traitement de création utilisateur', [
-            'error' => $e->getMessage(),
-        ]);
-        throw $e;
+            $this->logger->error('Erreur lors du traitement de création utilisateur', [
+                'error' => $e->getMessage(),
+            ]);
+            
+            return null;
         }
     }
 }

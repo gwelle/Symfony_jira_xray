@@ -29,7 +29,7 @@ class ActivationToken
     #[ORM\Column(length: 64)]
     private ?string $hashedToken = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
+    ##[ORM\Column(length: 255, nullable: true)]
     private ?string $previousHashedToken = null;
 
     public function getId(): ?int

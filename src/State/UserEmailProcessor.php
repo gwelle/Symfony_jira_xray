@@ -36,41 +36,53 @@ final class UserEmailProcessor implements ProcessorInterface
      */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed
     {
-        // On délègue au processor principal de Doctrine (il fait le persist + flush)
+        // On extrait le processor qui vient avant le tien dans la chaîne (UserCreationProcessor)
         $user = $this->processor->process($data, $operation, $uriVariables, $context);
 
         // Si c'est une création d'utilisateur, on envoie l'email de confirmation              
-        if ($user instanceof User && $user->getId()) {
-            $tokenEntity = $user->getActivationTokens()->first()?->setAccount($user);
-            $token = $tokenEntity?->getPlainToken();
-
-            if($token) {
-                try {
-                    $this->bus->dispatch(new SendConfirmationEmail(
-                        $user->getEmail(),
-                        $token,
-                    $user->getFirstName() . ' ' . $user->getLastName(),
-                    false
-                    ));
-
-                    // On nettoie le token en clair après l'envoi de l'email
-                    $tokenEntity->setPlainToken(null);
-                    $this->entityManager->flush();
-                } 
-                catch (\Throwable $e) {
-                    $this->logger->error('Erreur lors de l’envoi de l’email de confirmation', [
-                        'user' => $user->getEmail(),
-                        'error' => $e->getMessage(),
-                    ]);
-                }
-            } 
-            else {
-                $this->logger->warning('Token utilisateur absent pour l’envoi de l’email', [
-                    'user' => $user->getEmail(),
-                ]);
-            }
+        if (!$user instanceof User) {
+            $this->logger->error('Processor reçu une donnée non conforme');
+            return null;
         }
 
-        return $user;
+        $activationToken = $user->getActivationTokens()->first();
+        if($activationToken){
+            $activationToken->setAccount($user);
+        }
+        $tokenPlain = $activationToken->getPlainToken();
+
+        if (!$user->getEmail() || !$tokenPlain) {
+            $this->logger->warning('Utilisateur sans email ou token : email non envoyé', [
+            'user' => $user->getEmail(),
+            ]);
+            return $user;
+        }
+
+        try {
+            $this->bus->dispatch(new SendConfirmationEmail(
+                $user->getEmail(),
+                $tokenPlain,
+                $user->getFullName(),
+                false
+            ));
+
+            // On nettoie le token en clair après l'envoi de l'email
+            $activationToken->setPlainToken(null);
+            $this->entityManager->flush();
+
+            
+            $this->logger->info('Email de confirmation envoyé à l\'utilisateur', [
+                'user' => $user->getEmail()
+            ]);
+            return $user;
+        } 
+        catch (\Throwable $e) {
+            $this->logger->error('Erreur lors de l’envoi de l’email de confirmation', [
+                'user' => $user->getEmail(),
+                'error' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
     }
 }

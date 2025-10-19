@@ -4,6 +4,7 @@ namespace App\tests\Unit\Mock;
 
 use PHPUnit\Framework\TestCase;
 use App\State\UserCreationProcessor;
+use App\State\UserEmailProcessor;
 use App\Entity\User;
 use App\Entity\ActivationToken;
 use App\Service\ActivationService;
@@ -14,6 +15,9 @@ use ApiPlatform\State\ProcessorInterface;
 use \Faker\Generator;
 use Faker\Factory; 
 use PHPUnit\Framework\MockObject\MockObject;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Messenger\MessageBusInterface;
+
 
 class ProcessorTest extends TestCase
 {
@@ -25,6 +29,8 @@ class ProcessorTest extends TestCase
     private MockObject|LoggerInterface $logger;
     private MockObject|ProcessorInterface $processor;
     private MockObject|Operation $operation;
+    private MockObject|EntityManagerInterface $entityManager;
+    private MockObject|MessageBusInterface $bus;
 
     protected function setUp(): void
     {
@@ -52,6 +58,13 @@ class ProcessorTest extends TestCase
         $this->faker = null;
         $this->user = null;
         $this->activationToken = null;
+        unset($this->userPasswordHasher);
+        unset($this->activationService);
+        unset($this->logger);
+        unset($this->processor);
+        unset($this->operation);
+        unset($this->entityManager);
+        unset($this->bus);
         parent::tearDown();
     }  
 
@@ -66,22 +79,38 @@ class ProcessorTest extends TestCase
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->processor = $this->createMock(ProcessorInterface::class);
         $this->operation = $this->createStub(Operation::class);
+        $this->entityManager = $this->createStub(EntityManagerInterface::class);
+        $this->bus = $this->createMock(MessageBusInterface::class);
     }
 
     /**
      * Helper method to process user creation.
      * @param mixed $data The data to process.
+     * @param mixed $instance The instance of the processor.
      * @return mixed The result of the user creation processing.
      */
-    public function userCreationProcessorResult(mixed $data): mixed
+    public function userProcessorResult(mixed $data, mixed $instance): mixed
     {
-        $userCreationProcessor = new UserCreationProcessor(
+        if (is_a($instance, UserCreationProcessor::class, true)) {
+            $userCreationProcessor = new UserCreationProcessor(
+                $this->processor,
+                $this->userPasswordHasher,
+                $this->activationService,
+                $this->logger
+            );
+            return $userCreationProcessor->process($data, $this->operation);
+        }
+        else if (is_a($instance, UserEmailProcessor::class, true)) {
+            $userEmailProcessor = new UserEmailProcessor(
             $this->processor,
-            $this->userPasswordHasher,
-            $this->activationService,
-            $this->logger
-        );
-        return $userCreationProcessor->process($data, $this->operation);
+                $this->bus,
+                $this->entityManager,
+                $this->logger
+            );
+            return $userEmailProcessor->process($data, $this->operation);
+        }
+
+        return null;
     }
 
     /**
@@ -107,7 +136,7 @@ class ProcessorTest extends TestCase
 
         $this->user->addActivationToken($this->activationToken);
 
-        $result = $this->userCreationProcessorResult($this->user);
+        $result = $this->userProcessorResult($this->user,UserCreationProcessor::class);
 
         $this->assertInstanceOf(User::class,$result);
 
@@ -132,7 +161,7 @@ class ProcessorTest extends TestCase
             ->method('error')
             ->with($this->stringContains('Processor reçu une donnée non conforme'));
 
-        $result = $this->userCreationProcessorResult(new \stdClass());
+        $result = $this->userProcessorResult(new \stdClass(), UserCreationProcessor::class);
 
         $this->assertNull($result);
     }
@@ -151,7 +180,7 @@ class ProcessorTest extends TestCase
             ->method('error')
             ->with($this->stringContains('Mot de passe manquant, utilisateur non créé.'));
 
-        $result = $this->userCreationProcessorResult($this->user);
+        $result = $this->userProcessorResult($this->user, UserCreationProcessor::class);
         
         $this->assertNull($result);
     }
@@ -174,9 +203,8 @@ class ProcessorTest extends TestCase
 
         $this->activationToken->setPlainToken("");
 
-        $result = $this->userCreationProcessorResult($this->user);
+        $result = $this->userProcessorResult($this->user, UserCreationProcessor::class);
 
         $this->assertNull($result);
-        
     }
 }

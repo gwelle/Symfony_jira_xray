@@ -5,6 +5,8 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use App\Entity\User;
 use ApiPlatform\State\ProcessorInterface;
+use App\Repository\UserRepository;
+use App\Service\UserService;
 use App\Service\ActivationService;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Psr\Log\LoggerInterface;
@@ -15,12 +17,15 @@ class UserCreationProcessor implements ProcessorInterface
      * Constructor for UserStateProcessor.
      * @param ProcessorInterface $processor The next processor in the chain.
      * @param UserPasswordHasherInterface $passwordHasher The password hasher service.
+     * @param UserRepository $userRepository The user repository for database operations.
+     * @param UserService $userService The user service for user-related operations.
      * @param ActivationService $activationService The activation service for generating tokens.
      * @param LoggerInterface $logger The logger service for logging errors.
      */
     public function __construct(
         private ProcessorInterface $processor,
         private UserPasswordHasherInterface $passwordHasher,
+        private UserService $userService,
         private ActivationService $activationService,
         private LoggerInterface $logger
     ) {}
@@ -48,15 +53,12 @@ class UserCreationProcessor implements ProcessorInterface
         }
 
         try {
-
             $hashedPassword = $this->passwordHasher->hashPassword(
                 $data, 
                 $data->getPlainPassword()
             );
-            $data->setPassword($hashedPassword);
-            $data->setPlainPassword(''); // Clear the plain password after hashing
-            $data->setConfirmationPassword(''); // Clear the confirmation password
-
+            $this->userService->upgradeUserPassword($data, $hashedPassword);
+            
             $this->activationService->generateToken($data);
 
             $this->logger->info('User created successfully');

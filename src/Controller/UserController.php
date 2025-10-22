@@ -3,7 +3,7 @@
 namespace App\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\Response;
+
 use Symfony\Component\Routing\Attribute\Route;
 use App\Entity\User;
 use App\Service\ActivationService;
@@ -11,6 +11,8 @@ use App\Message\SendConfirmationEmail;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use App\Response\UserActivatedResponse;
+use App\Response\ResendMailResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -21,9 +23,9 @@ final class UserController extends AbstractController
 
     /**
      * Summary of __construct
-     * @param \App\Service\ActivationService $activationService
-     * @param \Doctrine\ORM\EntityManagerInterface $entityManager
-     * @param \Symfony\Component\Messenger\MessageBusInterface $bus
+     * @param ActivationService $activationService
+     * @param EntityManagerInterface $entityManager
+     * @param MessageBusInterface $bus
      */
     public function __construct(
         private ActivationService $activationService,
@@ -44,21 +46,24 @@ final class UserController extends AbstractController
      * Activates a user account based on the provided token.
      * Redirects to the frontend login page with activation status.
      * @param string $token The activation token from the URL.
-     * @return Response A redirect response to the frontend login page with query parameters indicating success or failure.
+     * @return UserActivatedResponse A redirect response to the frontend login page with query parameters indicating success or failure.
      */
     #[Route('/api/users/activate_account/{token}', name: 'user_activate', methods: ['GET'])]
-    public function activate(string $token): Response
+    public function activate(string $token): UserActivatedResponse
     {
         $results = $this->activationService->activateAccount($token);
-
+        $status = $results->status ?? null;
         try {
-            switch ($results['status']) {
+            switch ($status) {
                 case 'success':
-                    return $this->json(['success' => 'Compte activé'], 200);
+                    return new UserActivatedResponse(
+                        ["status" => "Account activated"], 200);
+                    /*return new RedirectFrontendResponse(['activated' => 1]);*/
                 case 'already_activated':
-                    return $this->json(['info' => 'already_activated'], 200);
+                    return new UserActivatedResponse(
+                        ["status" => "Account already activated"], 200);
                 case 'expired':
-                    $tokenExpired = $results['token']; // objet ActivationToken
+                    $tokenExpired = $results->data ?? null; // objet ActivationToken
                     $user = $tokenExpired->getAccount();
 
                     // Génération nouveau token
@@ -71,21 +76,25 @@ final class UserController extends AbstractController
                         $user->getFirstName().' '.$user->getLastName(),
                         true
                     ));
-                    return $this->json(['error' => 'token_expired'], 400);
+                    return new UserActivatedResponse(
+                        ["error" => "Token expired"], 410
+                    );
                 case 'blocked':
-                    return $this->json(['error' => 'max_resend_reached'], 429);
+                    return new UserActivatedResponse(
+                        ["error" => "Max resend reached"], 429
+                    );
                 case 'invalid':
                 default:
-                    return $this->json(['error' => 'invalid_token'], 400);
+                    return new UserActivatedResponse(
+                        ["error" => "Invalid token"], 400
+                    );
                 }
             }
             
         catch (\Throwable $e) {
             // Retourne toujours un JSON pour Jest
-            return $this->json([
-                'error' => 'internal_error',
-                'message' => $e->getMessage()
-            ], 500);
+            return new UserActivatedResponse(
+                ["error" => "internal error", "message" => $e->getMessage()], 500);  
         }
     }
 
@@ -98,7 +107,7 @@ final class UserController extends AbstractController
     #[Route('/api/users/resend_activation_account', name: 'user_resend_activation', methods: ['POST'])]
     public function resendActivation(Request $request,
         #[Autowire(service: 'limiter.token_invalid_limiter')]
-        RateLimiterFactory $tokenInvalidLimiter): Response {
+        RateLimiterFactory $tokenInvalidLimiter): ResendMailResponse {
 
         // Extraire l’email de la requête JSON
         $data = json_decode($request->getContent(), true);
@@ -112,10 +121,8 @@ final class UserController extends AbstractController
         ]);
 
         if (!$user) {
-            return $this->json([
-            'status' => 'handled',
-            'info' => 'check_resend_email'
-            ],404);
+            return new ResendMailResponse(
+                ['status' => 'handled', 'info' => 'Checking resend_email'], 404);
         }
 
         // Générer un nouveau token
@@ -126,10 +133,8 @@ final class UserController extends AbstractController
 
         // Vérifier si la limite est atteinte
         if (!$limiter->consume(1)->isAccepted()) {
-            return $this->json([
-                'status' => 'error',
-                'error' => 'max_resend_reached'
-            ],429);
+            return new ResendMailResponse(
+                ['status' => 'error', 'error' => 'Max resend reached'], 429);
         }
 
         // Renvoyer l’e-mail
@@ -140,10 +145,8 @@ final class UserController extends AbstractController
                 true
         ));
 
-        return $this->json([
-            'status' => 'resend',
-            'info' => 'check_resend_email'
-        ],200);
+        return new ResendMailResponse(
+            ['status' => 'handled', 'info' => 'Checking resend_email'], 200);
     }
 
     /**
@@ -154,12 +157,11 @@ final class UserController extends AbstractController
     public function refreshExpiredTokens(): JsonResponse
     {
         // Appelle la méthode pour rafraîchir les tokens expirés
-        $results = $this->activationService->refreshExpiredTokens();
+        $this->activationService->refreshExpiredTokens();
 
         return new JsonResponse([
             'status' => 'success',
-            'message' => 'Tokens refreshed',
-            'results' => $results
+            'message' => 'Tokens regenerated after many token expirations',
         ], 200);
     }
 
@@ -174,27 +176,15 @@ final class UserController extends AbstractController
         $user = $this->entityManager->getRepository(User::class)->find($id);
 
         if (!$user) {
-            return $this->json(['error' => 'User not found'], 404);
+            return new JsonResponse(['error' => 'User not found'], 404);
         }
 
         $token = $this->activationService->getValidTokenForUser($user);
 
         if (!$token) {
-            return $this->json(['error' => 'No valid token found'], 404);
-        }
+            return new JsonResponse(null, 204);
+        }   
 
-        return $this->json(['token' => $token], 200);
+        return new JsonResponse(['token' => $token,], 200);
     }
-
-    /**
-     * Redirects to the frontend login page with optional query parameters.
-     * @param array $params Optional query parameters to append to the URL.
-     * @return RedirectResponse A redirect response to the frontend login page.
-     */
-    /*private function redirectToFrontend(array $params = []): RedirectResponse
-    {
-        $frontendLoginUrl = $_ENV['URL_LOGIN_FRONT'].'/login';
-        // Append any additional query parameters encoded and securely
-        return $this->redirect($frontendLoginUrl . '?' . http_build_query($params));
-    }*/
 }

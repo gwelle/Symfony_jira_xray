@@ -29,8 +29,8 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         }
 
         $user->setPassword($newHashedPassword);
-        $this->getEntityManager()->persist($user);
-        $this->getEntityManager()->flush();
+        $user->setPlainPassword(''); // Clear the plain password after hashing
+        $user->setConfirmationPassword(''); // Clear the confirmation password
     }
 
     //    /**

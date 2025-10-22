@@ -49,7 +49,7 @@ class MailerService{
                 <p>Merci de vous être inscrit. Pour activer votre compte, cliquez sur ce lien :</p>
                 <p><a href='{$confirmationUrl}'>Activer mon compte</a></p>
                 <p>Ce lien est valable 24 heures.</p>";
-            }
+        }
 
         $emailMessage = (new Email())
             ->from('no-reply@account.com')

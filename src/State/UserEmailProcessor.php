@@ -4,6 +4,7 @@ namespace App\State;
 
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
+use App\Entity\ActivationToken;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use App\Message\SendConfirmationEmail;
@@ -46,11 +47,13 @@ final class UserEmailProcessor implements ProcessorInterface
         }
 
         $activationToken = $user->getActivationTokens()->first();
-        if($activationToken){
-            $activationToken->setAccount($user);
-        }
-        $tokenPlain = $activationToken->getPlainToken();
+        $tokenPlain = null;
 
+        if ($activationToken instanceof ActivationToken) {
+            $activationToken->setAccount($user);
+            $tokenPlain = $activationToken->getPlainToken();
+        }
+        
         if (!$user->getEmail() || !$tokenPlain) {
             $this->logger->warning('Utilisateur sans email ou token : email non envoyé', [
             'user' => $user->getEmail(),
@@ -70,10 +73,10 @@ final class UserEmailProcessor implements ProcessorInterface
             $activationToken->setPlainToken(null);
             $this->entityManager->flush();
 
-            
             $this->logger->info('Email de confirmation envoyé à l\'utilisateur', [
                 'user' => $user->getEmail()
-            ]);
+            ]);     
+
             return $user;
         } 
         catch (\Throwable $e) {

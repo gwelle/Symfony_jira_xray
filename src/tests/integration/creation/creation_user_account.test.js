@@ -87,7 +87,7 @@ if (!API_URL) {
     });
 
       it('should return 422 Unprocessable Entity for email already', async () => {
-        const usedEmail = 'xeuakt.uvtk0t@gmail.com';
+        const usedEmail = 'mslyev.csiann5z@gmail.com';
         const { response } = await createUser(API_URL, { email: usedEmail });
         expect(response.status).toBe(422);
         expect(response.statusText).toEqual('Unprocessable Entity');
@@ -98,7 +98,7 @@ if (!API_URL) {
         const { response } = await createUser(API_URL, { confirmationPassword: plainPassword + 'X' });
         expect(response.status).toBe(422);
         expect(response.statusText).toEqual('Unprocessable Entity');
-    });
+      });
 
       it('should return 422 Unprocessable Entity for empty field', async () => {
         const { response } = await createUser(API_URL, { email: '' });

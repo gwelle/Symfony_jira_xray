@@ -86,7 +86,7 @@ final class UserController extends AbstractController
                 case 'invalid':
                 default:
                     return new UserActivatedResponse(
-                        ["error" => "Invalid token"], 400
+                        ["error" => "Invalid Token"], 400
                     );
                 }
             }
@@ -122,7 +122,7 @@ final class UserController extends AbstractController
 
         if (!$user) {
             return new ResendMailResponse(
-                ['status' => 'handled', 'info' => 'Checking resend_email'], 404);
+                ['status' => 'handled', 'info' => 'Checking resend email'], 404);
         }
 
         // Générer un nouveau token
@@ -146,7 +146,7 @@ final class UserController extends AbstractController
         ));
 
         return new ResendMailResponse(
-            ['status' => 'handled', 'info' => 'Checking resend_email'], 200);
+            ['status' => 'resend', 'info' => 'Checking resend email'], 200);
     }
 
     /**

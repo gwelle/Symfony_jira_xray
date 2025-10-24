@@ -36,21 +36,21 @@ describe('Activate User Account', () => {
     const { response } = await activateUser(apiUrl, activationToken);
     const data = await expectValidResponse(response, 200);
 
-    (data.success ? 
-      expect(data.success).toMatch(/Compte activé/) : expect(data.info).toMatch(/already_activated/)
+    (data.status ? 
+      expect(data.status).toMatch(/Account activated/) : expect(data.status).toMatch(/Account already activated/)
     );
   });
 
   it('should return a message already activated', async () => {
     const { response } = await activateUser(apiUrl, activationToken);
     const data = await expectValidResponse(response, 200);
-    expect(data.info).toMatch(/already_activated/);
+    expect(data.status).toMatch(/Account already activated/);
   });
 
   it('should return a message invalid token', async () => {
     const { response } = await activateUser(apiUrl, tokenInvalid);
     const data = await expectValidResponse(response, 400);
-    expect(data.error).toMatch(/invalid_token/);
+    expect(data.error).toMatch(/Invalid Token/);
   });
 
   it('should return a message token expired', async () => {
@@ -59,7 +59,7 @@ describe('Activate User Account', () => {
         headers: { 'Content-Type': 'application/json' },
     });
     const data = await expectValidResponse(getResponse, 200);
-    expect(data.message).toMatch(/Tokens refreshed/);
+    expect(data.message).toMatch(/Tokens regenerated after many token expirations/);
 
     await testActivateExpiredToken({ apiUrl, tokenExpired, maxAttempts: 4 })
   });
@@ -94,18 +94,17 @@ describe('Activate User Account', () => {
       if(resendResponse.status === 200) {
         attempts++;
         expect(resendData.status).toMatch(/resend/);
-        expect(resendData.info).toMatch(/check_resend_email/);
+        expect(resendData.info).toMatch(/Checking resend email/);
       }
       // Si le statut est 404, on vérifie le message et on continue la boucle
       else if (status === 404) {
-        console.log(`Tentative ignorée (404)`);
         expect(resendData.status).toMatch(/handled/);
-        expect(resendData.info).toMatch(/check_resend_email/);
+        expect(resendData.info).toMatch(/Checking resend email/);
       }
       // Si le statut est 429, on vérifie le message et on sort de la boucle
       else if (status === 429) {
         expect(resendData.status).toMatch(/error/);
-        expect(resendData.error).toMatch(/max_resend_reached/);
+        expect(resendData.error).toMatch(/Max resend reached/);
         break;
       }
       else {

@@ -92,7 +92,6 @@ export function randomPasswordPair(length = 8) {
 
   // Double vérification
   if (pair.plainPassword !== pair.confirmationPassword) {
-    console.error('[ERREUR CRITIQUE] Les mots de passe générés ne correspondent pas :', pair);
     fail('Les mots de passe ne correspondent pas — test interrompu');
   }
 
@@ -201,15 +200,16 @@ export async function testActivateExpiredToken({ apiUrl, tokenExpired, maxAttemp
     const status = response.status;
     const result = await response.json();
 
-    if (status === 400) {
+    if (status === 410) {
       // Token expiré
-      expect(result.error).toMatch(/token_expired/);
+      expect(result.error).toMatch(/Token expired/);
     } 
     else if (status === 429) {
       // Limite atteinte
-      expect(result.error).toMatch(/max_resend_reached/);
+      expect(result.error).toMatch(/Max resend reached/);
       break; // inutile de continuer
-    } else {
+    } 
+    else {
       throw new Error(`Unexpected status ${status}: ${JSON.stringify(result)}`);
     }
     await new Promise(r => setTimeout(r, 300)); // pause facultative

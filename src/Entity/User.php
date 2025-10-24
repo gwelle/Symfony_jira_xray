@@ -22,6 +22,10 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
         new Post(
             denormalizationContext: ['groups' => [self::GROUP_WRITE]],
             processor: UserEmailProcessor::class,
+            validationContext: [
+                // Ici on précise les groupes à utiliser pour la validation
+                'groups' => ['Default', 'passwords_check']
+            ]
         ),
         new Get(normalizationContext: ['groups' => [self::GROUP_READ]])
         
@@ -90,6 +94,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups([self::GROUP_WRITE,self::GROUP_READ])]
     private ?string $lastName = null;
 
+    #[Assert\NotBlank(message: 'Le mot de passe de confirmation est obligatoire.')]
+    #[Assert\NotNull(message: 'Le mot de passe de confirmation ne peut pas être null.')]
     #[Assert\Length(
         min: 8,
         minMessage: 'Votre mot de passe de confirmation doit comporter au moins {{ limit }} caractères.',
@@ -104,7 +110,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $confirmationPassword = null;
 
     #[Assert\NotBlank(message: 'Le mot de passe est obligatoire.')]
-    #[Assert\NotNull(message: 'Le mot de passe neut pas être null.')]
+    #[Assert\NotNull(message: 'Le mot de passe ne peut pas être null.')]
     #[Assert\Length(
         min: 8,
         minMessage: 'Votre mot de passe doit comporter au moins {{ limit }} caractères.',
@@ -350,6 +356,25 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
                 ->atPath('confirmationPassword')
                 ->addViolation();
         }
+    }
+
+
+    /**
+     * Permet d’activer dynamiquement des groupes selon le type d’opération (POST, PUT, etc.)
+     * @param mixed $user
+     * @param mixed $operation
+     * @param mixed $context
+     * @return array
+     */
+    public static function validationGroups($user, $operation, $context): array
+    {
+        // Pour une création, on ajoute le groupe password_check
+        if ($operation instanceof Post) {
+            return ['Default', 'passwords_check'];
+        }
+
+        // Sinon, validation normale
+        return ['Default'];
     }
 }
 

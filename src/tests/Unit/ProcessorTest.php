@@ -30,6 +30,8 @@ class ProcessorTest extends TestCase
     private MockObject|UserPasswordHasherInterface $userPasswordHasher;
     private MockObject|ActivationService $activationService;
     private MockObject|LoggerInterface $logger;
+    
+    /** @var MockObject|ProcessorInterface<object|null, object|null> */
     private MockObject|ProcessorInterface $processor;
     private MockObject|Operation $operation;
     private MockObject|EntityManagerInterface $entityManager;
@@ -198,7 +200,7 @@ class ProcessorTest extends TestCase
             ->getActivationTokens()
             ->first()
             ->getPlainToken());
-        $this->assertTrue($result->getActivationTokens()->count() >= 0);
+        $this->assertGreaterThanOrEqual(0, $result->getActivationTokens()->count());
     }
 
     /**

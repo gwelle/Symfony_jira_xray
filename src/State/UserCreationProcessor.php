@@ -11,13 +11,17 @@ use App\Service\ActivationService;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Psr\Log\LoggerInterface;
 
+/** 
+ * UserCreationProcessor is responsible for processing user creation requests.
+ * It hashes the user's password and generates an activation token before persisting the user.
+ * @implements ProcessorInterface<User, User> $processor The next processor in the chain.
+ */
 class UserCreationProcessor implements ProcessorInterface
 {
     /**
      * Constructor for UserStateProcessor.
-     * @param ProcessorInterface $processor The next processor in the chain.
+     * @param ProcessorInterface<User, User> $processor The next processor in the chain.
      * @param UserPasswordHasherInterface $passwordHasher The password hasher service.
-     * @param UserRepository $userRepository The user repository for database operations.
      * @param UserService $userService The user service for user-related operations.
      * @param ActivationService $activationService The activation service for generating tokens.
      * @param LoggerInterface $logger The logger service for logging errors.
@@ -33,10 +37,10 @@ class UserCreationProcessor implements ProcessorInterface
     /**
      * Processes the User entity before persisting it.
      * This method hashes the password and sets the creation date if not already set.
-     * @param mixed $data The data to process, expected to be an instance of User.
+     * @param  $data The data to process, expected to be an instance of User.
      * @param Operation $operation The operation being executed.
-     * @param array $uriVariables The URI variables.
-     * @param array $context The context for the operation.
+     * @param array<string, string> $uriVariables The URI variables.
+     * @param array<string, mixed> $context The context for the operation.
      * @return mixed The processed data, typically the User entity.
      */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed

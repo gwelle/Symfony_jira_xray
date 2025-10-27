@@ -11,11 +11,16 @@ use App\Message\SendConfirmationEmail;
 use App\Entity\User;
 use Psr\Log\LoggerInterface;
 
+/** 
+ * UserEmailProcessor is responsible for sending a confirmation email to the user after creation.
+ * It retrieves the activation token and dispatches a message to send the email.
+ * @implements ProcessorInterface<User, User> $processor The next processor in the chain.
+ */
 final class UserEmailProcessor implements ProcessorInterface
 {
     /**
      * Constructor for UserEmailProcessor.
-     * @param ProcessorInterface $processor The next processor in the chain.
+     * @param ProcessorInterface<User, User> $processor The next processor in the chain.
      * @param MessageBusInterface $bus The message bus for dispatching messages.
      * @param EntityManagerInterface $entityManager The entity manager for database operations.
      * @param LoggerInterface $logger The logger service for logging errors.
@@ -31,8 +36,8 @@ final class UserEmailProcessor implements ProcessorInterface
      * Processes the User entity to send a confirmation email after creation.
      * @param mixed $data The data to process, expected to be an instance of User.
      * @param Operation $operation The operation being executed.
-     * @param array $uriVariables The URI variables.
-     * @param array $context The context for the operation.
+     * @param array<string, string> $uriVariables The URI variables.
+     * @param array<string, mixed> $context The context for the operation.
      * @return mixed The processed data, typically the User entity.
      */
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): mixed

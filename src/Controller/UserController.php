@@ -102,7 +102,7 @@ final class UserController extends AbstractController
      * Resends the activation email to the user with a new token.
      * @param Request $request The HTTP request containing the email in the JSON body.
      * @param RateLimiterFactory $tokenInvalidLimiter The rate limiter to prevent abuse.
-     * @return JsonResponse A JSON response indicating success or failure of the operation.
+     * @return ResendMailResponse A response indicating the result of the resend operation.
      */
     #[Route('/api/users/resend_activation_account', name: 'user_resend_activation', methods: ['POST'])]
     public function resendActivation(Request $request,

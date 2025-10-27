@@ -2,8 +2,10 @@
 
 namespace App\Service;
 
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class MailerService{
 
@@ -13,15 +15,19 @@ class MailerService{
      */
     private MailerInterface $mailer;
     private string $activationAccountUrl;
+    private LoggerInterface $logger;
 
     /**
      * MailerService constructor.
      * @param MailerInterface $mailer The mailer service for sending emails.
      * @param string $activationAccountUrl The base URL for account activation links.
+     * @param LoggerInterface $logger The logger service for logging errors.
      */
-    public function __construct(MailerInterface $mailer, string $activationAccountUrl){
+    public function __construct(MailerInterface $mailer, string $activationAccountUrl, 
+        LoggerInterface $logger){
         $this->mailer = $mailer;
         $this->activationAccountUrl = rtrim($activationAccountUrl, '/'); // pour éviter les doubles slashes
+        $this->logger = $logger;
     }
 
     /**
@@ -30,11 +36,17 @@ class MailerService{
      * @param string $token The activation token to be included in the email.
      * @param string $userName The name of the user to personalize the email.
      * @param bool $isResend Indicates if this is a resend of the confirmation email.
+     * @return void
      */
     public function sendConfirmationEmail(string $email, string $token, string $userName,bool $isResend = false)
     {
         $confirmationUrl = $this->activationAccountUrl . "/activate_account/".urlencode($token);
         $resendUrl = $this->activationAccountUrl . "/resend_activation_account/".urlencode($email);
+
+        if(!empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            $this->logger->error("Adresse email invalide : {$email}");
+            return;
+        }
 
         if ($isResend) {
         $subject = 'Renvoi du lien de confirmation de votre compte';
@@ -57,6 +69,13 @@ class MailerService{
             ->subject($subject)
             ->html($html);
 
-        $this->mailer->send($emailMessage);
+        try{
+            $this->mailer->send($emailMessage);
+            $this->logger->info("Email de confirmation envoyé à {$email}");
+        }
+        catch (TransportExceptionInterface $e){
+            // Gérer l'erreur d'envoi d'email (journalisation, notification, etc.)
+            $this->logger->error("Erreur lors de l'envoi de l'email de confirmation à {$email} : " . $e->getMessage());
+        }
     }
 }

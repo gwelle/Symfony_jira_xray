@@ -67,7 +67,7 @@ class ActivationService
     /**
      * Régénère un token pour l’utilisateur.
      * Marque toujours l’ancien token comme expiré avant de créer le nouveau.
-     * @param ActivationToken $activationToken
+     * @param ActivationToken $oldActivationToken Le token d’activation à régénérer.
      * @return string Le nouveau token en clair (à envoyer si besoin)
      * @throws \Exception En cas d’erreur lors de la régénération du token.
      */
@@ -99,7 +99,7 @@ class ActivationService
     /**
      * Retrieves a valid activation token for the given user.
      * @param User $user The user for whom to retrieve the activation token.
-     * @return ActivationToken A valid activation token entity.
+     * @return string|null A valid activation token entity.
      */
     public function getValidTokenForUser(User $user): ?string
     {
@@ -110,7 +110,7 @@ class ActivationService
      * Activates a user account based on the provided token.
      * Returns an array with status and the token entity if applicable.
      * @param string $hashedToken The activation token in hashed form.
-     * @return array An associative array with 'status' (success, expired, invalid)
+     * @return ActivateStatusResponse An associative array with 'status' (success, expired, invalid)
      */
     public function activateAccount(string $hashedToken): ActivateStatusResponse
     {
@@ -188,7 +188,7 @@ class ActivationService
      * Refreshes expired activation tokens for users who haven't activated their accounts.
      * @param \DateInterval|null $interval The time interval to look back from now. Defaults to 1 hour if null.
      * @param int $limit The maximum number of tokens to process.
-     * @return array An array of IDs of the tokens that were updated.
+     * @return void
      */
     public function refreshExpiredTokens(?\DateInterval $interval = null, int $limit = 50): void{
         $tokens = $this->activationTokenRepository

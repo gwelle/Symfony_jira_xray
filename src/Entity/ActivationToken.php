@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Repository\ActivationTokenRepository;
 use Doctrine\ORM\Mapping as ORM;
+use DateTimeImmutable;
 
 #[ORM\Entity(repositoryClass: ActivationTokenRepository::class)]
 class ActivationToken
@@ -21,10 +22,10 @@ class ActivationToken
     private ?User $account = null;
 
     #[ORM\Column]
-    private ?\DateTimeImmutable $createdAt = null;
+    private ?DateTimeImmutable $createdAt = null;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    private ?\DateTimeImmutable $expiredAt = null;
+    private ?DateTimeImmutable $expiredAt = null;
 
     #[ORM\Column(length: 64)]
     private ?string $hashedToken = null;
@@ -65,24 +66,24 @@ class ActivationToken
         return $this;
     }
 
-    public function getCreatedAt(): ?\DateTimeImmutable
+    public function getCreatedAt(): ?DateTimeImmutable
     {
         return $this->createdAt;
     }
 
-    public function setCreatedAt(\DateTimeImmutable $createdAt): static
+    public function setCreatedAt(DateTimeImmutable $createdAt): static
     {
         $this->createdAt = $createdAt;
 
         return $this;
     }
 
-    public function getExpiredAt(): ?\DateTimeImmutable
+    public function getExpiredAt(): ?DateTimeImmutable
     {
         return $this->expiredAt;
     }
 
-    public function setExpiredAt(?\DateTimeImmutable $expiredAt): static
+    public function setExpiredAt(?DateTimeImmutable $expiredAt): static
     {
         $this->expiredAt = $expiredAt;
 
@@ -91,7 +92,7 @@ class ActivationToken
 
     public function isExpired(): bool
     {
-        return $this->expiredAt !== null && $this->expiredAt < new \DateTimeImmutable();
+        return $this->expiredAt !== null && $this->expiredAt < new DateTimeImmutable();
     }
 
     public function isValid(): bool
@@ -122,7 +123,7 @@ class ActivationToken
         $this->previousHashedToken = $this->hashedToken;
 
         // Expirer le token courant
-        $this->expiredAt = new \DateTimeImmutable();
+        $this->expiredAt = new DateTimeImmutable();
 
         // Générer un nouveau token brut et son hash
         $plainToken = bin2hex(random_bytes(32));
@@ -132,7 +133,7 @@ class ActivationToken
         $this->plainToken = $plainToken;
         $this->hashedToken = $hashedToken;
 
-        $this->createdAt = new \DateTimeImmutable();
+        $this->createdAt = new DateTimeImmutable();
         $this->expiredAt = null;
     }
 

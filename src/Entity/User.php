@@ -16,6 +16,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Validator\Context\ExecutionContextInterface;
+use DateTimeImmutable;
 
 #[ApiResource(
     operations: [
@@ -126,9 +127,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(nullable:true,type: 'datetime_immutable', options: ['default' => 'CURRENT_TIMESTAMP'])]
     #[Groups([self::GROUP_READ])]
-    private ?\DateTimeImmutable $createdAt = null;
+    private ?DateTimeImmutable $createdAt = null;
 
-    #[ORM\Column(type: 'boolean', nullable: false, options: ['default' => false])]
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private ?bool $isActivated = false;
 
     /**
@@ -263,12 +264,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getCreatedAt(): ?\DateTimeImmutable
+    public function getCreatedAt(): ?DateTimeImmutable
     {
         return $this->createdAt;
     }
 
-    public function setCreatedAt(\DateTimeImmutable $createdAt): static
+    public function setCreatedAt(DateTimeImmutable $createdAt): static
     {
         $this->createdAt = $createdAt;
 
@@ -279,7 +280,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function onPrePersist(): void
     {
         if (!$this->createdAt) {
-            $this->createdAt = new \DateTimeImmutable();
+            $this->createdAt = new DateTimeImmutable();
         }
     }
 
@@ -320,7 +321,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      * @param \App\Entity\ActivationToken $activationToken
      * @return User|null
      */
-    public function addActivationToken(ActivationToken $activationToken): static
+    public function addActivationToken(ActivationToken $activationToken): ?User
     {
         if (!$this->activationTokens->contains($activationToken)) {
             $this->activationTokens->add($activationToken);
@@ -334,7 +335,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      * @param \App\Entity\ActivationToken $activationToken
      * @return User|null
      */
-    public function removeActivationToken(ActivationToken $activationToken): static
+    public function removeActivationToken(ActivationToken $activationToken): ?User
     {
         if ($this->activationTokens->removeElement($activationToken) && $activationToken->getAccount() === $this) {
             // set the owning side to null (unless already changed)
@@ -361,12 +362,11 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     /**
      * Permet d’activer dynamiquement des groupes selon le type d’opération (POST, PUT, etc.)
-     * @param mixed $user
+     * 
      * @param mixed $operation
-     * @param mixed $context
-     * @return array
+     * @return string[]
      */
-    public static function validationGroups($user, $operation, $context): array
+    public static function validationGroups($operation): array
     {
         // Pour une création, on ajoute le groupe password_check
         if ($operation instanceof Post) {

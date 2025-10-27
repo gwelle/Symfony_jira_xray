@@ -78,9 +78,9 @@ class ActivationTokenTest extends TestCase
         self::$activationToken->setPlainToken($plainToken);
         self::$activationToken->setHashedToken($hashedToken);
 
-        $this->assertEquals(expected: $plainToken, actual: self::$activationToken->getPlainToken());
-        $this->assertEquals(expected: $hashedToken, actual: self::$activationToken->getHashedToken());
-        $this->assertNotSame(expected: self::$activationToken->getPlainToken(), actual: self::$activationToken->getHashedToken());
+        $this->assertEquals($plainToken, self::$activationToken->getPlainToken());
+        $this->assertEquals($hashedToken, self::$activationToken->getHashedToken());
+        $this->assertNotSame(self::$activationToken->getPlainToken(), self::$activationToken->getHashedToken());
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', self::$activationToken->getHashedToken());
     }
 

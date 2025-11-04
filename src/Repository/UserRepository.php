@@ -8,11 +8,12 @@ use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\PasswordUpgraderInterface;
+use App\Interfaces\UserProviderInterface;
 
 /**
  * @extends ServiceEntityRepository<User>
  */
-class UserRepository extends ServiceEntityRepository implements PasswordUpgraderInterface
+class UserRepository extends ServiceEntityRepository implements PasswordUpgraderInterface, UserProviderInterface
 {
     public function __construct(ManagerRegistry $registry)
     {
@@ -31,6 +32,16 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
         $user->setPassword($newHashedPassword);
         $user->setPlainPassword(''); // Clear the plain password after hashing
         $user->setConfirmationPassword(''); // Clear the confirmation password
+    }
+
+    /**
+     * Finds a user by their ID.
+     * @param int $id The ID of the user.
+     * @return User|null The user entity or null if not found.
+     */
+    public function getUserById(int $id): ?User
+    {
+        return $this->find($id);
     }
 
     //    /**

@@ -29,23 +29,40 @@ services:
     App\State\UserCreationProcessor:
         arguments:
             $processor: '@api_platform.doctrine.orm.state.persist_processor'
-            $passwordHasher: '@security.user_password_hasher'
-            $activationService: '@App\Service\ActivationService'
-            $logger: '@logger'
         tags:
             - { name: 'api_platform.state_processor', priority: 20 }
 
     App\State\UserEmailProcessor:
         arguments:
-            $processor: '@App\State\UserCreationProcessor'
-            $bus: '@messenger.default_bus'
-            $logger: '@logger'
+            $previousProcessor: '@App\State\UserCreationProcessor'
         tags:
             - { name: 'api_platform.state_processor', priority: 10 }
+
+    App\Strategy\RegistrationEmailStrategy:
+        tags:
+            - { name: 'app.email_strategy', alias: 'registration_email' }
+
+    App\Strategy\AutomaticResendEmailStrategy:
+        tags:
+            - { name: 'app.email_strategy', alias: 'automatic_resend_email' }
+
+    App\Service\EmailService:
+        public: true
+
+    # Dire à Symfony que chaque injection de EmailSenderInterface utilise EmailService
+    App\Interfaces\EmailSenderInterface: '@App\Service\EmailService'
+    # Dire à Symfony que chaque injection de UserProviderInterface utilise UserRepository 
+    App\Interfaces\UserProviderInterface: '@App\Repository\UserRepository'
     
-    App\Service\MailerService:
-        arguments:
-            $activationAccountUrl: '%activation.account.url%'
+    # Dire à Symfony que chaque injection de PasswordUpgraderInterface utilise UserRepository
+    Symfony\Component\Security\Core\User\PasswordUpgraderInterface: '@App\Repository\UserRepository'
+
+    # Dire à Symfony que chaque injection de GenerateTokenInterface utilise GenerateTokenService
+    App\Interfaces\GenerateTokenInterface: '@App\Service\GenerateTokenService'
+
+
+
+    
 
     
 

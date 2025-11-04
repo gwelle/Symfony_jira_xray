@@ -5,10 +5,9 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use App\Entity\User;
 use ApiPlatform\State\ProcessorInterface;
-use App\Repository\UserRepository;
-use App\Service\UserService;
-use App\Service\ActivationService;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Security\Core\User\PasswordUpgraderInterface;
+use App\Interfaces\GenerateTokenInterface;
 use Psr\Log\LoggerInterface;
 
 /** 
@@ -20,17 +19,17 @@ class UserCreationProcessor implements ProcessorInterface
 {
     /**
      * Constructor for UserStateProcessor.
-     * @param ProcessorInterface<User, User> $processor The next processor in the chain.
+     * @param ProcessorInterface $processor The next processor in the chain.
      * @param UserPasswordHasherInterface $passwordHasher The password hasher service.
-     * @param UserService $userService The user service for user-related operations.
-     * @param ActivationService $activationService The activation service for generating tokens.
-     * @param LoggerInterface $logger The logger service for logging errors.
+     * @param PasswordUpgraderInterface $passwordUpgrader The password upgrader service.
+     * @param GenerateTokenInterface $generate The token generation service.
+     * @param LoggerInterface $logger The logger service.
      */
     public function __construct(
         private ProcessorInterface $processor,
         private UserPasswordHasherInterface $passwordHasher,
-        private UserService $userService,
-        private ActivationService $activationService,
+        private PasswordUpgraderInterface $passwordUpgrader,
+        private GenerateTokenInterface $tokenGenerator,
         private LoggerInterface $logger
     ) {}
 
@@ -48,6 +47,7 @@ class UserCreationProcessor implements ProcessorInterface
         // Check if the data is an instance of User and has a plain password
         if (!$data instanceof User) {
             $this->logger->error('Processor reçu une donnée non conforme');
+            dump("instance de user",$data);
             return null;
         }
 
@@ -57,20 +57,20 @@ class UserCreationProcessor implements ProcessorInterface
         }
 
         try {
-            $hashedPassword = $this->passwordHasher->hashPassword(
-                $data, 
-                $data->getPlainPassword()
-            );
-            $this->userService->upgradeUserPassword($data, $hashedPassword);
-            
-            $this->activationService->generateToken($data);
+            $hashed = $this->passwordHasher->hashPassword($data, $data->getPlainPassword());
+
+            $this->passwordUpgrader->upgradeUserPassword($data, $hashed);
+
+            $this->tokenGenerator->generateToken($data);
 
             $this->logger->info('User created successfully');
+
             return $this->processor->process($data, $operation, $uriVariables, $context);
         } 
         catch (\Throwable $e) {
             $this->logger->error('Erreur lors du traitement de création utilisateur', [
-                'error' => $e->getMessage(),
+                'message' => $e->getMessage(),
+                'exception' => $e,
             ]);
             
             return null;

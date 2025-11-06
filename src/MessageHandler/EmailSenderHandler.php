@@ -6,6 +6,8 @@ use App\Message\EmailSender;
 use App\Registry\EmailStrategyRegistry;
 use App\Interfaces\EmailSenderInterface;
 use App\Interfaces\UserProviderInterface;
+use Psr\Log\LoggerInterface;
+use App\Strategy\EmailData;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 // indique à Symfony que c'est un handler pour Messenger
@@ -18,11 +20,13 @@ class EmailSenderHandler
      * @param EmailSenderInterface $emailSender The email sender interface.
      * @param EmailStrategyRegistry $emailStrategyRegistry The email strategy registry.
      * @param UserProviderInterface $userProvider The user provider interface.
+     * @param LoggerInterface $logger The logger interface.
      */
     public function __construct(
         private EmailSenderInterface $emailSender,
         private EmailStrategyRegistry $emailStrategyRegistry,
-        private UserProviderInterface $userProvider
+        private UserProviderInterface $userProvider,
+        private LoggerInterface $logger
     ){}
 
     /**
@@ -33,12 +37,30 @@ class EmailSenderHandler
     public function __invoke(EmailSender $message)
     {
         $user = $this->userProvider->getUserById($message->userId);
+
         if (!$user) {
-            // utilisateur non trouvé → log ou ignorer
+            $this->logger->warning("User #{$message->userId} not found");
+            return; // Stop si utilisateur absent
+        }
+
+        $token = $user->getActivationTokens()->first();
+        if (!$token->getPlainToken()) {
+            $this->logger->warning("Aucun token d'activation pour {$user->getEmail()}");
             return;
         }
 
-        $strategy = $this->emailStrategyRegistry->get($message->strategyName);
-        $this->emailSender->sendEmail($strategy, $user);
+        $emailData = new EmailData(
+            user: $user, 
+            token: $token->getPlainToken()
+        );
+
+        try {
+            $strategy = $this->emailStrategyRegistry->get($message->strategyName);
+            $this->emailSender->sendEmail($strategy, $emailData);
+        } 
+        catch (\InvalidArgumentException $e) {
+            $this->logger->error("Unknown email strategy: {$message->strategyName}");
+            return;
+        }
     }
 }

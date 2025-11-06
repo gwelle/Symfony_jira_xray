@@ -13,24 +13,21 @@ class ActivationService
 {
     private EntityManagerInterface $entityManager;
     private RateLimiterFactory $tokenExpiredLimiter;
-    private UserService $userService;
     private ActivationTokenRepository $activationTokenRepository;
 
     /**
      * Constructor for ActivationService.
      * @param EntityManagerInterface $entityManager The entity manager for database operations.
      * @param RateLimiterFactory $tokenExpiredLimiter The rate limiter for expired token requests.
-     * @param UserService $userService The user service for user-related operations.
      * @param ActivationTokenRepository $activationTokenRepository The activation token repository for token-related operations.
      */
     public function __construct(EntityManagerInterface $entityManager,
      #[Autowire(service: 'limiter.token_expired_limiter')]
-     RateLimiterFactory $tokenExpiredLimiter, UserService $userService, 
+     RateLimiterFactory $tokenExpiredLimiter, 
      ActivationTokenRepository $activationTokenRepository) 
     {
         $this->entityManager = $entityManager;
         $this->tokenExpiredLimiter = $tokenExpiredLimiter;
-        $this->userService = $userService;
         $this->activationTokenRepository = $activationTokenRepository;
     }
 

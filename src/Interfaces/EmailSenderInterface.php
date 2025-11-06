@@ -3,14 +3,14 @@
 namespace App\Interfaces;
 
 use App\Interfaces\EmailStrategyInterface;
-use App\Entity\User;
+use App\Strategy\EmailData;
 
 interface EmailSenderInterface
 {
     /**
      * Sends an email using the specified strategy.
-     * @param User $user The user to whom the email will be sent.
+     * @param EmailData $data The data to use for building the email.
      * @return void
      */
-    public function sendEmail(EmailStrategyInterface $strategy, User $user): void;
+    public function sendEmail(EmailStrategyInterface $strategy, EmailData $data): void;
 }

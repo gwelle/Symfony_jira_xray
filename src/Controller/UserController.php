@@ -7,7 +7,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Routing\Attribute\Route;
 use App\Entity\User;
 use App\Service\ActivationService;
-use App\Message\SendConfirmationEmail;
+use App\Message\EmailSender;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -22,7 +22,7 @@ final class UserController extends AbstractController
 {
 
     /**
-     * Summary of __construct
+     * Constructor.
      * @param ActivationService $activationService
      * @param EntityManagerInterface $entityManager
      * @param MessageBusInterface $bus
@@ -70,12 +70,7 @@ final class UserController extends AbstractController
                     $newToken = $this->activationService->generateToken($user);
 
                     // Envoi email de confirmation
-                    $this->bus->dispatch(new SendConfirmationEmail(
-                        $user->getEmail(),
-                        $newToken,
-                        $user->getFirstName().' '.$user->getLastName(),
-                        true
-                    ));
+                    $this->bus->dispatch(new EmailSender('automatic_resend',$user->getId()));
                     return new UserActivatedResponse(
                         ["error" => "Token expired"], 410
                     );
@@ -138,12 +133,7 @@ final class UserController extends AbstractController
         }
 
         // Renvoyer l’e-mail
-        $this->bus->dispatch(new SendConfirmationEmail(
-                $user->getEmail(),
-                $token,
-                $user->getFirstName().' '.$user->getLastName(),
-                true
-        ));
+        $this->bus->dispatch(new EmailSender('automatic_resend',$user->getId()));
 
         return new ResendMailResponse(
             ['status' => 'resend', 'info' => 'Checking resend email'], 200);

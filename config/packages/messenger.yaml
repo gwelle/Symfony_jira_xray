@@ -7,7 +7,7 @@ framework:
                 options:
                     table_name: messenger_messages # php bin/console messenger:setup-transports
                     use_notify: true
-                    check_delayed_interval: 60000 #permet d’optimiser les envois groupés pour la performance.
+                    check_delayed_interval: 1000 #permet d’optimiser les envois groupés pour la performance.
         routing:
             'App\Message\EmailSender': async
         buses:

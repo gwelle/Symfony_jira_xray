@@ -47,7 +47,6 @@ class UserCreationProcessor implements ProcessorInterface
         // Check if the data is an instance of User and has a plain password
         if (!$data instanceof User) {
             $this->logger->error('Processor reçu une donnée non conforme');
-            dump("instance de user",$data);
             return null;
         }
 
@@ -59,7 +58,7 @@ class UserCreationProcessor implements ProcessorInterface
         try {
             $hashed = $this->passwordHasher->hashPassword($data, $data->getPlainPassword());
 
-            $this->passwordUpgrader->upgradeUserPassword($data, $hashed);
+            $this->passwordUpgrader->upgradePassword($data, $hashed);
 
             $this->tokenGenerator->generateToken($data);
 

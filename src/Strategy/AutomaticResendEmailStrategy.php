@@ -4,13 +4,14 @@ namespace App\Strategy;
 
 use App\Strategy\EmailData;
 use App\Interfaces\EmailStrategyInterface;
-use App\Exception\EmailBuildException;
 use Symfony\Component\Mime\Email;
+use App\Exception\EmailBuildException;
 
-final class RegistrationEmailStrategy implements EmailStrategyInterface
+final class AutomaticResendEmailStrategy  implements EmailStrategyInterface
 {
+
     private string $activationAccountUrl;
-    
+
     /**
      * Constructor.
      * @param string $activationAccountUrl
@@ -19,21 +20,15 @@ final class RegistrationEmailStrategy implements EmailStrategyInterface
     {
         $this->activationAccountUrl = rtrim($activationAccountUrl, '/'); // pour éviter les doubles slashes
     }
-    
+
     /**
-     * Build an email for the specified user.
+     * Send an email to the specified user.
      * @param EmailData $data
      * @return Email
      * @throws EmailBuildException if email construction fails
      */
     public function buildEmail(EmailData $data): Email
     {
-        // Récupérer le token d'activation
-        $token = $data->token;
-        if(!$token){
-            throw new EmailBuildException("Aucun token d'activation trouvé pour l'utilisateur : {$user->getEmail()}");
-        }
-
         $user = $data->user;
 
         // Valider l'adresse email de l'utilisateur
@@ -41,28 +36,27 @@ final class RegistrationEmailStrategy implements EmailStrategyInterface
             throw new EmailBuildException("Adresse email invalide : {$user->getEmail()}");
         }
 
-        // Construire l'URL d'activation
-        $rawActivationUrl = $this->activationAccountUrl . "/activate_account/" . urlencode($token);
-        if (!filter_var($rawActivationUrl, FILTER_VALIDATE_URL)) {
-            throw new EmailBuildException("Activation URL invalide : {$rawActivationUrl}");
+        // Construire l'URL de renvoi
+        $rawResendUrl = $this->activationAccountUrl . "/resend_activation_account/".urlencode($user->getEmail());
+        if (!filter_var($rawResendUrl, FILTER_VALIDATE_URL)) {
+            throw new EmailBuildException("Resend URL invalide : {$rawResendUrl}");
         }
 
         // Échapper les données dynamiques : prévenir les attaques XSS
         $fullName  = htmlspecialchars($user->getFullName(), ENT_QUOTES | ENT_HTML5, 'UTF-8');
-        $activationUrl = htmlspecialchars($rawActivationUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $resenActivationdUrl = htmlspecialchars($rawResendUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8');
         
         $html = "
             <p>Bonjour {$fullName},</p>
-            <p>Merci de vous être inscrit. Pour activer votre compte, cliquez sur ce lien :</p>
-            <p><a href='{$activationUrl}'>Activer mon compte</a></p>
-            <p>Ce lien est valable 24 heures.</p>
+            <p>Voici un nouveau lien pour activer votre compte :</p>
+            <p><a href='{$resenActivationdUrl}'>Activer mon compte</a></p>
         ";
 
         // Retour de l'Email (sans catch → laissé au EmailService)
         return (new Email())
             ->from('no-reply@account.com')
             ->to($user->getEmail())
-            ->subject('Confirmation de la création de votre compte')
+            ->subject('Renvoi du lien de confirmation de votre compte')
             ->html($html);
     }
 
@@ -72,7 +66,6 @@ final class RegistrationEmailStrategy implements EmailStrategyInterface
      */
     public function getName(): string
     {
-        return 'registration_send';
+        return 'automatic_resend';
     }
-
 }

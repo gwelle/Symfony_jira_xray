@@ -67,13 +67,13 @@ final class UserEmailProcessor implements ProcessorInterface
         }
 
         try {
-            $this->bus->dispatch(new EmailSender('registration',$user->getId()));
+            $this->bus->dispatch(new EmailSender('registration_send',$user->getId()));
 
             // On nettoie le token en clair après l'envoi de l'email
             $activationToken->setPlainToken(null);
             $this->entityManager->flush();
 
-            $this->logger->info('Email de confirmation envoyé', [
+            $this->logger->info('Email de confirmation envoyé avec succès', [
                 'email' => $user->getEmail()
             ]);     
 

@@ -39,12 +39,16 @@ services:
             - { name: 'api_platform.state_processor', priority: 10 }
 
     App\Strategy\RegistrationEmailStrategy:
+        arguments:
+            $activationAccountUrl: '%activation.account.url%'
         tags:
-            - { name: 'app.email_strategy', alias: 'registration_email' }
+            - { name: 'app.email_strategy', alias: 'registration_send' }
 
     App\Strategy\AutomaticResendEmailStrategy:
+        arguments:
+            $activationAccountUrl: '%activation.account.url%'
         tags:
-            - { name: 'app.email_strategy', alias: 'automatic_resend_email' }
+            - { name: 'app.email_strategy', alias: 'automatic_resend' }
 
     App\Service\EmailService:
         public: true

@@ -5,7 +5,7 @@ namespace App\Service;
 use Psr\Log\LoggerInterface;
 use App\Interfaces\EmailSenderInterface;
 use App\Interfaces\EmailStrategyInterface;
-use App\Entity\User;
+use App\Strategy\EmailData;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
@@ -32,21 +32,26 @@ class EmailService implements EmailSenderInterface{
     /**
      * Sends an email using the specified strategy.
      * @param EmailStrategyInterface $strategy The email strategy to use for building the email.
-     * @param User $user The user to whom the email will be sent.
+     * @param EmailData $data The data to use for building the email.
      * @return void
+     * @throws TransportExceptionInterface If there is an error during email sending.
+     * @throws EmailBuildException If there is an error during email building.
      */
-    public function sendEmail(EmailStrategyInterface $strategy, User $user): void
+    public function sendEmail(EmailStrategyInterface $strategy, EmailData $data): void
     {
         try {
-            $email = $strategy->buildEmail($user);
+            $email = $strategy->buildEmail($data);
+            $user = $data->user;
             $this->mailer->send($email);
             $this->logger->info("Email envoyé à {$user->getEmail()} avec stratégie " . $strategy->getName());
 
         } 
+        catch (EmailBuildException $e) {
+            $this->logger->error("Erreur lors de la construction de l'email : " . $e->getMessage());
+            return;
+        }
         catch (TransportExceptionInterface $e) {
-            // Gérer l'erreur d'envoi d'email (journalisation, notification, etc.)
             $this->logger->error("Erreur lors de l'envoi de l'email à {$user->getEmail()} avec stratégie " . $strategy->getName() . " : " . $e->getMessage());
-
         }
     }
 }

@@ -9,6 +9,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Security\Core\User\PasswordUpgraderInterface;
 use App\Interfaces\GenerateTokenInterface;
 use Psr\Log\LoggerInterface;
+use App\Exception\MissingPasswordException;
+use InvalidArgumentException;
 
 /** 
  * UserCreationProcessor is responsible for processing user creation requests.
@@ -46,13 +48,11 @@ class UserCreationProcessor implements ProcessorInterface
     {
         // Check if the data is an instance of User and has a plain password
         if (!$data instanceof User) {
-            $this->logger->error('Processor reçu une donnée non conforme');
-            return null;
+            throw new InvalidArgumentException('Le Processor a reçu une donnée non conforme : User attendu.');
         }
 
         if (!$data->getPlainPassword()) {
-            $this->logger->error('Mot de passe manquant, utilisateur non créé.');
-            return null;
+            throw new MissingPasswordException('Mot de passe manquant, utilisateur non créé.');
         }
 
         try {
@@ -68,11 +68,13 @@ class UserCreationProcessor implements ProcessorInterface
         } 
         catch (\Throwable $e) {
             $this->logger->error('Erreur lors du traitement de création utilisateur', [
+                'exceptionClass' => get_class($e),
                 'message' => $e->getMessage(),
-                'exception' => $e,
+                'userId' => $data->userId ?? null
             ]);
             
-            return null;
+            throw $e; // ✅ on relance proprement
         }
     }
+
 }

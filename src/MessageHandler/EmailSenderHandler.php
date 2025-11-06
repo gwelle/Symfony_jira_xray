@@ -43,15 +43,15 @@ class EmailSenderHandler
             return; // Stop si utilisateur absent
         }
 
-        $token = $user->getActivationTokens()->first();
-        if (!$token->getPlainToken()) {
+        $token = $message->token;
+        if (!$token) {
             $this->logger->warning("Aucun token d'activation pour {$user->getEmail()}");
             return;
         }
 
         $emailData = new EmailData(
             user: $user, 
-            token: $token->getPlainToken()
+            token: $token
         );
 
         try {

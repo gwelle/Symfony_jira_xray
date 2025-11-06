@@ -69,8 +69,12 @@ final class UserController extends AbstractController
                     // Génération nouveau token
                     $newToken = $this->activationService->generateToken($user);
 
-                    // Envoi email de confirmation
-                    $this->bus->dispatch(new EmailSender('automatic_resend',$user->getId()));
+                    // Renvoyer email de confirmation
+                    $this->bus->dispatch(new EmailSender(
+                        'automatic_resend',
+                        $user->getId(),
+                        $newToken
+                    ));
                     return new UserActivatedResponse(
                         ["error" => "Token expired"], 410
                     );
@@ -133,7 +137,11 @@ final class UserController extends AbstractController
         }
 
         // Renvoyer l’e-mail
-        $this->bus->dispatch(new EmailSender('automatic_resend',$user->getId()));
+        $this->bus->dispatch(new EmailSender(
+                        'automatic_resend',
+                        $user->getId(),
+                        $token
+                    ));
 
         return new ResendMailResponse(
             ['status' => 'resend', 'info' => 'Checking resend email'], 200);

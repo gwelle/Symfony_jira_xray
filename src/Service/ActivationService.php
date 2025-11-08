@@ -98,7 +98,7 @@ class ActivationService
      * @param User $user The user for whom to retrieve the activation token.
      * @return string|null A valid activation token entity.
      */
-    public function getValidTokenForUser(User $user): ?string
+    public function getValidTokenUser(User $user): ?string
     {
        return $this->activationTokenRepository->currentActiveTokenCountForUser($user);
     }
@@ -159,7 +159,8 @@ class ActivationService
         }
 
         // 6. Activer le compte utilisateur
-        $this->userService->activate($user);
+        //$this->userService->activate($user);
+        $user->setIsActivated(true);
 
         // 7. Récupérer tous les tokens de l'utilisateur lié et archiver le dernier token
         $tokens = $this->entityManager->getRepository(ActivationToken::class)

@@ -2,7 +2,7 @@
 
 namespace App\Interfaces;
 
-interface RefreshTokenInterface
+interface ExpiredTokenRefreshInterface
 {
     /**
      * Refreshes expired tokens created within the specified interval.

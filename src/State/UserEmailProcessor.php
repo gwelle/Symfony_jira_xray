@@ -10,6 +10,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use App\Message\EmailSender;
 use App\Entity\User;
 use Psr\Log\LoggerInterface;
+use InvalidArgumentException;
 
 /** 
  * UserEmailProcessor is responsible for sending a confirmation email to the user after creation.
@@ -47,8 +48,7 @@ final class UserEmailProcessor implements ProcessorInterface
 
         // Si c'est une création d'utilisateur, on envoie l'email de confirmation              
         if (!$user instanceof User) {
-            $this->logger->error('Processor a reçu une donnée non conforme');
-            return null;
+            throw new InvalidArgumentException('Le Processor a reçu une donnée non conforme : User attendu.');
         }
 
         $activationToken = $user->getActivationTokens()->first();
@@ -89,7 +89,7 @@ final class UserEmailProcessor implements ProcessorInterface
                 'error' => $e->getMessage(),
             ]);
 
-            return null;
+            throw $e; // ✅ on relance proprement
         }
     }
 }

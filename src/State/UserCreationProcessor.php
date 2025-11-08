@@ -60,6 +60,8 @@ class UserCreationProcessor implements ProcessorInterface
 
             $this->passwordUpgrader->upgradePassword($data, $hashed);
 
+            $data->erasePlainAndConfirmationPassword();
+
             $this->tokenGenerator->generateToken($data);
 
             $this->logger->info('User created successfully');

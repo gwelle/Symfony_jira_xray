@@ -223,6 +223,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         // @deprecated, to be removed when upgrading to Symfony 8
     }
 
+    public function erasePlainAndConfirmationPassword(): void
+    {
+        $this->plainPassword = null;
+        $this->confirmationPassword = null;
+    }
+
     public function getFirstName(): ?string
     {
         return $this->firstName;

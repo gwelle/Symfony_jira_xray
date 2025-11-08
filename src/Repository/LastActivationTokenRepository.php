@@ -3,41 +3,58 @@
 namespace App\Repository;
 
 use App\Entity\LastActivationToken;
+use App\Entity\ActivationToken;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use App\Interfaces\LastActivationTokenProviderInterface;
 
 /**
  * @extends ServiceEntityRepository<LastActivationToken>
  */
-class LastActivationTokenRepository extends ServiceEntityRepository
+class LastActivationTokenRepository extends ServiceEntityRepository implements LastActivationTokenProviderInterface
 {
+    /**
+     * Constructor for LastActivationTokenRepository.
+     *
+     * @param ManagerRegistry $registry The manager registry for database operations.
+     */
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, LastActivationToken::class);
     }
 
-    //    /**
-    //     * @return LastActivationUser[] Returns an array of LastActivationUser objects
-    //     */
-    //    public function findByExampleField($value): array
-    //    {
-    //        return $this->createQueryBuilder('l')
-    //            ->andWhere('l.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->orderBy('l.id', 'ASC')
-    //            ->setMaxResults(10)
-    //            ->getQuery()
-    //            ->getResult()
-    //        ;
-    //    }
+    /**
+     * Saves the given activation token as the last archived token.
+     *
+     * @param ActivationToken $oldActivationToken The activation token to be archived.
+     * @return void
+     */
+    public function saveLastToken(ActivationToken $oldActivationToken): void
+    {
+        $archived = new LastActivationToken();
+        $archived->setAccount($oldActivationToken->getAccount());
+        $archived->setHashedToken($oldActivationToken->getHashedToken());
+        $archived->setCreatedAt($oldActivationToken->getCreatedAt());
+        $archived->setExpiredAt($oldActivationToken->getExpiredAt() ?? new \DateTimeImmutable());
 
-    //    public function findOneBySomeField($value): ?LastActivationUser
-    //    {
-    //        return $this->createQueryBuilder('l')
-    //            ->andWhere('l.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->getQuery()
-    //            ->getOneOrNullResult()
-    //        ;
-    //    }
+        $this->getEntityManager()->persist($archived);
+    }
+
+    /**
+     * Finds the last archived activation token for the given user.
+     *
+     * @param User $user The user whose last archived token is to be retrieved.
+     * @return LastActivationToken|null The last archived activation token or null if none found.
+     */
+    public function findLastArchivedToken(User $user): ?LastActivationToken
+    {
+        return $this->createQueryBuilder('t')
+            ->andWhere('t.account = :user')
+            ->setParameter('user', $user)
+            ->orderBy('t.archivedAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
 }

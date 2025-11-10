@@ -44,17 +44,17 @@ class LastActivationTokenRepository extends ServiceEntityRepository implements L
     /**
      * Finds the last archived activation token for the given user.
      *
-     * @param User $user The user whose last archived token is to be retrieved.
+     * @param string $hashedToken The hashed token to search for.
      * @return LastActivationToken|null The last archived activation token or null if none found.
      */
-    public function findLastArchivedToken(User $user): ?LastActivationToken
+    public function findLastArchivedToken(string $hashedToken): ?LastActivationToken
     {
         return $this->createQueryBuilder('t')
-            ->andWhere('t.account = :user')
-            ->setParameter('user', $user)
-            ->orderBy('t.archivedAt', 'DESC')
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+        ->andWhere('t.hashedToken = :token')
+        ->setParameter('token', $hashedToken)
+        ->getQuery()
+        ->getOneOrNullResult();
     }
+
+    
 }

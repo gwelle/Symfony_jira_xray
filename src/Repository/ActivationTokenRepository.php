@@ -32,6 +32,8 @@ class ActivationTokenRepository extends ServiceEntityRepository implements Activ
     public function findByToken(string $hashedToken): ?ActivationToken
     {
         return $this->createQueryBuilder('t')
+            ->leftJoin('t.account', 'u')
+            ->addSelect('u')
             ->andWhere('t.hashedToken = :token')
             ->setParameter('token', $hashedToken)
             ->getQuery()
@@ -114,5 +116,16 @@ class ActivationTokenRepository extends ServiceEntityRepository implements Activ
 
         return $qb ? $qb['hashedToken'] : null;
     }
+
+    public function findRawByToken(string $hashedToken)
+    {
+        return $this->createQueryBuilder('t')
+            ->select('t.hashedToken')
+            ->andWhere('t.hashedToken = :token')
+            ->setParameter('token', $hashedToken)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }   
+
 
 }

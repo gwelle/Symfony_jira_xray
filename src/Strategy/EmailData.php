@@ -8,6 +8,6 @@ class EmailData
 {
     public function __construct(
         public User $user,
-        public ?string $token = null
+        public ?string $hashedToken = null
     ) {}
 }

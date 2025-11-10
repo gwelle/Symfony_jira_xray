@@ -4,12 +4,9 @@ namespace App\Command;
 
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
-use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Console\Style\SymfonyStyle;
-use App\Service\ActivationService;
+use App\Interfaces\ExpiredTokenRefreshInterface;
 
 #[AsCommand(
     name: 'app:refresh-expired-tokens',
@@ -17,17 +14,16 @@ use App\Service\ActivationService;
 )]
 class RefreshExpiredTokensCommand extends Command
 {
-    private ActivationService $activationService;
+    private ExpiredTokenRefreshInterface $expiredTokenRefresh;
 
     /**
      * Constructor for RefreshExpiredTokensCommand.
-     *
-     * @param ActivationService $activationService The service responsible for activation token management.
+     * @param ExpiredTokenRefreshInterface $expiredTokenRefresh The service responsible for activation refresh token management.
      */
-    public function __construct(ActivationService $activationService)
+    public function __construct(ExpiredTokenRefreshInterface $expiredTokenRefresh)
     {
         parent::__construct();
-        $this->activationService = $activationService;
+        $this->expiredTokenRefresh = $expiredTokenRefresh;
     }
 
     /**
@@ -47,7 +43,7 @@ class RefreshExpiredTokensCommand extends Command
      */
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $this->activationService->refreshExpiredTokens();
+        $this->expiredTokenRefresh->refreshExpiredTokens();
         $output->writeln('Expired tokens have been refreshed.');
         return Command::SUCCESS;
     }

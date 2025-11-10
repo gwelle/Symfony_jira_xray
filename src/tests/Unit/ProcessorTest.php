@@ -7,19 +7,21 @@ use App\State\UserCreationProcessor;
 use App\State\UserEmailProcessor;
 use App\Entity\User;
 use App\Entity\ActivationToken;
-use App\Service\UserService;
-use App\Service\ActivationService;
+
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\Security\Core\User\PasswordUpgraderInterface;
 use Psr\Log\LoggerInterface;
 use ApiPlatform\Metadata\Operation; 
 use ApiPlatform\State\ProcessorInterface;
+use App\Interfaces\GenerateTokenInterface;
+
 use \Faker\Generator;
 use Faker\Factory; 
 use PHPUnit\Framework\MockObject\MockObject;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 use \Symfony\Component\Messenger\Envelope;
-use App\Message\SendConfirmationEmail;
+use App\Message\EmailSender;
 
 
 class ProcessorTest extends TestCase
@@ -28,14 +30,14 @@ class ProcessorTest extends TestCase
     private ?User $user;
     private ?ActivationToken $activationToken;
     private MockObject|UserPasswordHasherInterface $userPasswordHasher;
-    private MockObject|ActivationService $activationService;
+    private MockObject|GenerateTokenInterface $tokenGenerator;
     private MockObject|LoggerInterface $logger;
     
     /** @var MockObject|ProcessorInterface<object|null, object|null> */
     private MockObject|ProcessorInterface $processor;
     private MockObject|Operation $operation;
     private MockObject|EntityManagerInterface $entityManager;
-    private MockObject|UserService $userService;
+    private MockObject|PasswordUpgraderInterface $passwordUpgrader;
     private MockObject|MessageBusInterface $bus;
 
     protected function setUp(): void
@@ -65,8 +67,8 @@ class ProcessorTest extends TestCase
         $this->user = null;
         $this->activationToken = null;
         unset($this->userPasswordHasher);
-        unset($this->userService);
-        unset($this->activationService);
+        unset($this->passwordUpgrader);
+        unset($this->tokenGenerator);
         unset($this->logger);
         unset($this->processor);
         unset($this->operation);
@@ -82,12 +84,12 @@ class ProcessorTest extends TestCase
     public function initStubAndMocks(): void
     {
         $this->userPasswordHasher = $this->createStub(UserPasswordHasherInterface::class);
-        $this->activationService = $this->createStub(ActivationService::class);
+        $this->tokenGenerator = $this->createStub(GenerateTokenInterface::class);
         $this->logger = $this->createMock(LoggerInterface::class);
         $this->processor = $this->createMock(ProcessorInterface::class);
         $this->operation = $this->createStub(Operation::class);
         $this->entityManager = $this->createMock(EntityManagerInterface::class);
-        $this->userService = $this->createMock(UserService::class);
+        $this->passwordUpgrader = $this->createMock(PasswordUpgraderInterface::class);
         $this->bus = $this->createMock(MessageBusInterface::class);
     }
 
@@ -103,8 +105,8 @@ class ProcessorTest extends TestCase
             $userCreationProcessor = new UserCreationProcessor(
                 $this->processor,
                 $this->userPasswordHasher,
-                $this->userService,
-                $this->activationService,
+                $this->passwordUpgrader,
+                $this->tokenGenerator,
                 $this->logger
             );
             return $userCreationProcessor->process($data, $this->operation);
@@ -180,7 +182,7 @@ class ProcessorTest extends TestCase
     public function test_process_user_creation(): void
     {
         $this->userPasswordHasher->method('hashPassword')->willReturn('hashed_password');
-        $this->activationService->method('generateToken')->willReturn('fake_new_token');
+        $this->tokenGenerator->method('generateToken')->willReturn('fake_new_token');
         
         $this->logger->expects($this->never())->method('error');
 
@@ -241,7 +243,7 @@ class ProcessorTest extends TestCase
      */
     public function test_process_generation_token_throws_exception(): void
     {
-        $this->activationService
+        $this->tokenGenerator
             ->method('generateToken')
             ->willThrowException(new \Exception('Error generating token'));
 
@@ -267,13 +269,12 @@ class ProcessorTest extends TestCase
         $this->bus->expects($this->once())
             ->method('dispatch')
             ->with($this->callback(function ($message) {
-                return $message instanceof SendConfirmationEmail;
+                return $message instanceof EmailSender;
             }))
-            ->willReturn(new Envelope(new SendConfirmationEmail(
-                $this->user->getEmail(),
+            ->willReturn(new Envelope(new EmailSender(
+                'registration_send',
+                $this->user->getId(),
                 $this->activationToken->getPlainToken(),
-                $this->user->getFullName(),
-                false
             )));
         
         $this->expectsLogger("info","Email de confirmation envoyé à l'utilisateur");

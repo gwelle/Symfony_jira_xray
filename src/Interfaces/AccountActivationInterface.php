@@ -2,7 +2,7 @@
 
 namespace App\Interfaces;
 
-use App\Response\ActivateStatusResponse;
+use App\Dto\ActivationResult;
 use App\Entity\User;
 
 interface AccountActivationInterface
@@ -10,10 +10,10 @@ interface AccountActivationInterface
     /**
      * Activates a user account based on the provided hashed token.
      * @param string $hashedToken The hashed activation token.
-     * @return ActivateStatusResponse The response indicating the activation status.
+     * @return ActivationResult An ActivationResult object containing the status of the activation.
      * @throws \Exception if the activation process fails.
      */
-    public function activatedAccount(string $hashedToken): ActivateStatusResponse;
+    public function activatedAccount(string $hashedToken): ActivationResult;
 
     /**
      * Activates the user in database.

@@ -30,8 +30,7 @@ class GenerateTokenService implements GenerateTokenInterface
             $activationToken->setExpiredAt(null);
             $user->addActivationToken($activationToken);
 
-            // Return the plain token to be sent via email 
-            return $plainToken; 
+            return $activationToken->getHashedToken();
         } 
         catch (\Exception $e) {
             throw new \Exception('Error generating token: ' . $e->getMessage());

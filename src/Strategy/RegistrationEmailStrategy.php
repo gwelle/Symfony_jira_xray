@@ -29,9 +29,9 @@ final class RegistrationEmailStrategy implements EmailStrategyInterface
     public function buildEmail(EmailData $data): Email
     {
         // Récupérer le token d'activation
-        $token = $data->token;
-        if(!$token){
-            throw new EmailBuildException("Aucun token d'activation trouvé pour l'utilisateur : {$user->getEmail()}");
+        $hashedToken = $data->hashedToken;
+        if(!$hashedToken){
+            throw new EmailBuildException("Aucun token d'activation trouvé pour l'utilisateur : {$data->user->getEmail()}");
         }
 
         $user = $data->user;
@@ -42,7 +42,7 @@ final class RegistrationEmailStrategy implements EmailStrategyInterface
         }
 
         // Construire l'URL d'activation
-        $rawActivationUrl = $this->activationAccountUrl . "/activate_account/" . urlencode($token);
+        $rawActivationUrl = $this->activationAccountUrl . "/activate_account/" . urlencode($hashedToken);
         if (!filter_var($rawActivationUrl, FILTER_VALIDATE_URL)) {
             throw new EmailBuildException("Activation URL invalide : {$rawActivationUrl}");
         }

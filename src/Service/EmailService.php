@@ -8,6 +8,7 @@ use App\Interfaces\EmailStrategyInterface;
 use App\Strategy\EmailData;
 use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
+use App\Exception\EmailBuildException;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 class EmailService implements EmailSenderInterface{
